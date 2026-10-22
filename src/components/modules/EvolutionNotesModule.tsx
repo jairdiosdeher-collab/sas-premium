@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Patient, SoapNote, UserProfile } from '../../types';
 import { callGeminiApi } from '../../services/geminiService';
+import { useToast } from '../../context/ToastContext';
 
 interface EvolutionNotesModuleProps {
   user: UserProfile;
@@ -32,6 +33,7 @@ export const EvolutionNotesModule: React.FC<EvolutionNotesModuleProps> = ({
   selectedPatientId,
   onSaveNote,
 }) => {
+  const { showSuccess, showWarning } = useToast();
   const [currentPatientId, setCurrentPatientId] = useState<string>(
     selectedPatientId || patients[0]?.id || ''
   );
@@ -65,7 +67,7 @@ export const EvolutionNotesModule: React.FC<EvolutionNotesModuleProps> = ({
 
   const handleGenerateAiSoap = async () => {
     if (!rawRoughNotes.trim()) {
-      alert('Por favor escribe algunas notas o ideas de la sesión para que la IA pueda estructurarlas.');
+      showWarning('Notas requeridas', 'Por favor escribe algunas notas o ideas de la sesión para que la IA pueda estructurarlas.');
       return;
     }
 
@@ -116,7 +118,7 @@ Entrega el formato con lenguaje clínico riguroso pero con profunda sensibilidad
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPatientId || !subjective) {
-      alert('Completa al menos el relato subjetivo y selecciona el paciente.');
+      showWarning('Campos Incompletos', 'Completa al menos el relato subjetivo y selecciona el paciente.');
       return;
     }
 
@@ -135,7 +137,7 @@ Entrega el formato con lenguaje clínico riguroso pero con profunda sensibilidad
     };
 
     onSaveNote(newNote);
-    alert('Nota de evolución SOAP-S guardada con éxito en el expediente.');
+    showSuccess('Nota Guardada', 'Nota de evolución clínica SOAP-S guardada con éxito en el expediente.');
     // Reset inputs
     setSubjective('');
     setObjective('');

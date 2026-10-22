@@ -25,8 +25,19 @@ export const FloatingWhatsApp: React.FC = () => {
   ];
 
   const handleSendMessage = (message: string) => {
-    const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encoded}`, '_blank');
+    try {
+      const encoded = encodeURIComponent(message);
+      const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encoded}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (_e) {
+      // Safe fallback
+    }
     setIsOpen(false);
   };
 

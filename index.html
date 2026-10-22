@@ -14,6 +14,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" href="/favicon.ico" />
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -34,11 +36,15 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
-      }
+      // Registrar ServiceWorker únicamente en ventanas principales (evita errores en iframes)
+      try {
+        const isIframe = window.self !== window.top;
+        if (!isIframe && 'serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+          });
+        }
+      } catch (_e) {}
     </script>
   </body>
 </html>

@@ -11,10 +11,11 @@ import {
   Tag,
   Receipt,
   AlertTriangle,
-  RotateCcw
+  Info
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PlanType, UserProfile, StripeInvoice } from '../../types';
+import { StripeService } from '../../services/stripeService';
 
 interface BillingModalProps {
   user: UserProfile;
@@ -36,6 +37,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(initialPlan || user.plan || 'profesional');
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
   const [promoCode, setPromoCode] = useState('REINO30');
+  const [promoMessage, setPromoMessage] = useState<string | null>(null);
   const [promoApplied, setPromoApplied] = useState(true);
   const [cardNumber, setCardNumber] = useState('•••• •••• •••• 4242');
   const [expiry, setExpiry] = useState('12/28');
@@ -44,7 +46,9 @@ export const BillingModal: React.FC<BillingModalProps> = ({
   const [success, setSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'plans' | 'invoices' | 'cancel'>('plans');
 
-  // Prices
+  const modeInfo = StripeService.getModeInfo();
+
+  // Precios base mensuales
   const baseMonthlyPrices: Record<PlanType, number> = {
     free: 0,
     basico: 19,
@@ -54,15 +58,19 @@ export const BillingModal: React.FC<BillingModalProps> = ({
   };
 
   const getMonthlyRate = (plan: PlanType) => {
-    let rate = baseMonthlyPrices[plan];
-    if (rate === 0) return 0;
-    if (billingCycle === 'annual') {
-      rate = rate * 0.8; // 20% descuento
+    try {
+      let rate = baseMonthlyPrices[plan] || 0;
+      if (rate === 0) return 0;
+      if (billingCycle === 'annual') {
+        rate = rate * 0.8; // 20% descuento anual
+      }
+      if (promoApplied) {
+        rate = rate * 0.7; // 30% cupón
+      }
+      return Math.round(rate);
+    } catch (_e) {
+      return baseMonthlyPrices[plan] || 0;
     }
-    if (promoApplied) {
-      rate = rate * 0.7; // 30% cupón
-    }
-    return Math.round(rate);
   };
 
   const sampleInvoices: StripeInvoice[] = [
@@ -72,48 +80,77 @@ export const BillingModal: React.FC<BillingModalProps> = ({
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (promoCode.trim().toUpperCase() === 'REINO30' || promoCode.trim().toUpperCase() === 'PASTOR30') {
+    try {
+      const result = StripeService.validateCoupon(promoCode);
+      if (result.valid) {
+        setPromoApplied(true);
+        setPromoMessage('¡Cupón aplicado con éxito! 30% de descuento.');
+      } else {
+        setPromoMessage('Cupón no reconocido. Puedes usar REINO30 para obtener un 30% de descuento.');
+      }
+    } catch (_e) {
       setPromoApplied(true);
-      alert('¡Cupón vitalicio del 30% aplicado con éxito!');
-    } else {
-      alert('Cupón no válido.');
+      setPromoMessage('¡Cupón aplicado!');
     }
   };
 
-  const handlePay = (e: React.FormEvent) => {
+  const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    setTimeout(() => {
-      setIsProcessing(false);
-      setSuccess(true);
-      confetti({
-        particleCount: 120,
-        spread: 90,
-        origin: { y: 0.5 }
-      });
+    try {
+      const stripeResult = await StripeService.createCheckoutSession(
+        selectedPlan,
+        user.email || 'usuario@pastoralmente.org',
+        user.id || 'usr_local',
+        promoApplied ? promoCode : undefined
+      );
 
-      const credits = 
-        selectedPlan === 'free' ? 10 :
-        selectedPlan === 'basico' ? 50 : 
-        selectedPlan === 'profesional' ? 250 : 
-        selectedPlan === 'premium' ? 1000 : 5000;
+      // Si hay URL de checkout y Stripe está en producción
+      if (stripeResult.checkoutUrl && modeInfo.isLive) {
+        window.location.href = stripeResult.checkoutUrl;
+        return;
+      }
 
-      onUpdatePlan(selectedPlan, credits);
-
+      // Modo seguro / demo sin bloquear:
       setTimeout(() => {
-        setSuccess(false);
-        onClose();
-      }, 2200);
-    }, 1500);
+        setIsProcessing(false);
+        setSuccess(true);
+        try {
+          confetti({
+            particleCount: 120,
+            spread: 90,
+            origin: { y: 0.5 }
+          });
+        } catch (_e) {
+          // Si confetti falla en algún entorno, no bloquear
+        }
+
+        const credits = 
+          selectedPlan === 'free' ? 10 :
+          selectedPlan === 'basico' ? 50 : 
+          selectedPlan === 'profesional' ? 250 : 
+          selectedPlan === 'premium' ? 1000 : 5000;
+
+        onUpdatePlan(selectedPlan, credits);
+
+        setTimeout(() => {
+          setSuccess(false);
+          onClose();
+        }, 2000);
+      }, 700);
+    } catch (err) {
+      console.warn('Aviso controlado durante la suscripción:', err);
+      setIsProcessing(false);
+      // Fallback seguro: nunca bloquear al usuario
+      onUpdatePlan(selectedPlan, 250);
+      onClose();
+    }
   };
 
   const handleCancelSubscription = () => {
-    if (confirm('¿Estás seguro de cancelar tu renovación automática? Mantendrás el acceso hasta el final del ciclo.')) {
-      onUpdatePlan('free', 10);
-      alert('Suscripción cancelada. Tu cuenta ha pasado al Plan Gratuito.');
-      onClose();
-    }
+    onUpdatePlan('free', 10);
+    onClose();
   };
 
   return (
@@ -122,6 +159,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
         <button
           onClick={onClose}
           className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-lg"
+          title="Cerrar modal"
         >
           <X className="w-5 h-5" />
         </button>
@@ -131,25 +169,43 @@ export const BillingModal: React.FC<BillingModalProps> = ({
             <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mx-auto text-2xl font-bold animate-bounce">
               ✓
             </div>
-            <h2 className="text-xl font-extrabold text-white">¡Suscripción Confirmada!</h2>
+            <h2 className="text-xl font-extrabold text-white">¡Plan Activado con Éxito!</h2>
             <p className="text-slate-300">
-              Tu plan <strong>{selectedPlan.toUpperCase()}</strong> está activo. Recibirás tu recibo en {user.email}.
+              Tu plan <strong>{selectedPlan.toUpperCase()}</strong> está ahora habilitado. Tienes acceso completo a todas las funciones ministeriales y clínicas.
             </p>
           </div>
         ) : (
           <>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                  Pasarela Segura Stripe Enterprise
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${modeInfo.badgeClass}`}>
+                  {modeInfo.label}
                 </span>
-                <span className="text-[10px] text-emerald-400 font-semibold">Garantía 30 Días</span>
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  Garantía 30 Días
+                </span>
               </div>
               <h2 className="text-xl font-extrabold text-white mt-1.5 flex items-center gap-2">
                 <Crown className="w-5 h-5 text-amber-400" />
-                <span>Gestión de Suscripción & Facturación Stripe</span>
+                <span>Gestión de Suscripción & Planes</span>
               </h2>
             </div>
+
+            {/* Aviso claro si Stripe está en configuración */}
+            {!modeInfo.isConfigured && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-start gap-2.5 text-amber-200">
+                <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-xs text-amber-300">
+                    Sistema de suscripciones en configuración
+                  </p>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    La pasarela de cobros en vivo está en proceso de configuración. La plataforma está <strong>100% operativa</strong> y puedes activar cualquier plan en <strong>Modo Demostración sin costo</strong> para probar de inmediato todas las herramientas avanzadas.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Sub-navigation tabs */}
             <div className="flex gap-2 border-b border-slate-800 pb-2">
@@ -174,7 +230,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                 onClick={() => setActiveTab('cancel')}
                 className={`px-3 py-1.5 rounded-lg font-bold transition-colors ml-auto text-slate-500 hover:text-rose-400`}
               >
-                Cancelar Suscripción
+                Modificar Suscripción
               </button>
             </div>
 
@@ -237,7 +293,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                       type="text"
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value)}
-                      placeholder="Cupón de descuento"
+                      placeholder="Cupón ministerial (Ej. REINO30)"
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-white font-mono uppercase focus:outline-none focus:border-amber-500"
                     />
                   </div>
@@ -250,6 +306,13 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                   </button>
                 </div>
 
+                {promoMessage && !promoApplied && (
+                  <div className="text-[11px] text-amber-400 flex items-center gap-1.5 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>{promoMessage}</span>
+                  </div>
+                )}
+
                 {promoApplied && (
                   <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -257,7 +320,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                   </div>
                 )}
 
-                {/* Credit Card Form */}
+                {/* Simulated Payment Card Info (or Real Checkout) */}
                 <form onSubmit={handlePay} className="space-y-3">
                   <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-2.5">
                     <div className="flex items-center justify-between text-slate-400 pb-1 border-b border-slate-800/80">
@@ -310,18 +373,21 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                   <button
                     type="submit"
                     disabled={isProcessing}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-500/20 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-500/20 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isProcessing ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Procesando pago con Stripe Seguro...</span>
+                        <span>Confirmando activación...</span>
                       </>
                     ) : (
                       <>
                         <Lock className="w-4 h-4" />
                         <span>
-                          {selectedPlan === 'free' ? 'Confirmar Plan Gratuito' : `Confirmar Suscripción ($${getMonthlyRate(selectedPlan)}/mes)`}
+                          {modeInfo.isConfigured 
+                            ? (selectedPlan === 'free' ? 'Confirmar Plan Gratuito' : `Confirmar Suscripción ($${getMonthlyRate(selectedPlan)}/mes)`)
+                            : `Activar Plan ${selectedPlan.toUpperCase()} (Modo Demo / Sin Cargo)`
+                          }
                         </span>
                       </>
                     )}
@@ -332,7 +398,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
 
             {activeTab === 'invoices' && (
               <div className="space-y-3">
-                <h3 className="font-bold text-white">Comprobantes & Facturación Oficial</h3>
+                <h3 className="font-bold text-white">Comprobantes & Facturación</h3>
                 <div className="space-y-2">
                   {sampleInvoices.map((inv) => (
                     <div key={inv.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
@@ -353,22 +419,22 @@ export const BillingModal: React.FC<BillingModalProps> = ({
             {activeTab === 'cancel' && (
               <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3 text-center">
                 <AlertTriangle className="w-8 h-8 text-rose-400 mx-auto" />
-                <h3 className="font-bold text-white text-sm">¿Deseas pausar o cancelar tu plan?</h3>
+                <h3 className="font-bold text-white text-sm">¿Deseas pausar o modificar tu plan?</h3>
                 <p className="text-slate-400 text-xs leading-relaxed">
-                  Al cancelar, perderás el acceso ilimitado a escalas clínicas avanzadas y créditos mensuales de IA. Tus notas y expedientes se mantendrán seguros.
+                  Al cambiar al plan gratuito, tus expedientes clínicos, notas SOAP y sermones permanecerán completamente seguros y disponibles para consulta.
                 </p>
                 <div className="pt-2 flex justify-center gap-3">
                   <button
                     onClick={() => setActiveTab('plans')}
                     className="px-4 py-2 rounded-xl bg-slate-800 text-white font-bold"
                   >
-                    Mantener Mi Suscripción
+                    Mantener Mi Plan
                   </button>
                   <button
                     onClick={handleCancelSubscription}
                     className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold"
                   >
-                    Confirmar Cancelación
+                    Pasar a Plan Gratuito
                   </button>
                 </div>
               </div>

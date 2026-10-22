@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User, ShieldCheck, ArrowRight, Loader2, Sparkles, Building } from 'lucide-react';
+import { X, Lock, Mail, User, ArrowRight, Loader2, Globe, Cloud, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 
@@ -12,7 +12,7 @@ interface AuthModalProps {
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMode = 'login' }) => {
   if (!isOpen) return null;
 
-  const { login, register, sendPasswordReset, socialLogin } = useAuth();
+  const { login, register, sendPasswordReset, socialLogin, isCloudConnected } = useAuth();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(defaultMode);
 
   // Form states
@@ -48,17 +48,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
         setErrorMessage(res.error || 'Error al crear la cuenta.');
       }
     } else {
-      await sendPasswordReset(email);
+      const res = await sendPasswordReset(email);
       setIsLoading(false);
-      setSuccessMessage(`Se ha enviado un enlace de recuperación seguro a ${email}.`);
+      if (res.success) {
+        setSuccessMessage(res.message);
+      } else {
+        setErrorMessage(res.message);
+      }
     }
   };
 
   const handleSocial = async (provider: 'google' | 'microsoft' | 'github') => {
     setIsLoading(true);
-    await socialLogin(provider);
+    setErrorMessage(null);
+    const res = await socialLogin(provider);
     setIsLoading(false);
-    onClose();
+    if (res.success) {
+      onClose();
+    } else if (res.error) {
+      setErrorMessage(res.error);
+    }
   };
 
   return (
@@ -82,8 +91,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
             {mode === 'forgot' && 'Recuperar Contraseña'}
           </h2>
           <p className="text-slate-400 text-xs mt-1">
-            Suite clínica y homilética con cifrado de grado médico y secreto pastoral.
+            Suite clínica y pastoral con Firebase Auth & Firestore.
           </p>
+          <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950 border border-slate-800 text-[11px]">
+            {isCloudConnected ? (
+              <>
+                <Cloud className="w-3 h-3 text-emerald-400" />
+                <span className="text-emerald-400 font-semibold">🟢 Nube conectada</span>
+              </>
+            ) : (
+              <>
+                <Globe className="w-3 h-3 text-rose-400" />
+                <span className="text-rose-400 font-semibold">🔴 Modo local</span>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Tab switch */}
@@ -115,8 +137,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
         )}
 
         {successMessage && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-semibold">
-            {successMessage}
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-semibold flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <span>{successMessage}</span>
           </div>
         )}
 
@@ -194,8 +217,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
                   >
                     <option value="psicologo">Psicólogo Clínico</option>
                     <option value="pastor">Pastor Principal</option>
-                    <option value="consejero">Consejero Pastoral</option>
-                    <option value="director_ministerio">Director Ministerio</option>
+                    <option value="supervisor">Supervisor Clínico</option>
+                    <option value="administrador">Administrador del Sistema</option>
+                    <option value="invitado">Invitado / Demo</option>
                   </select>
                 </div>
                 <div>
@@ -215,12 +239,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50 transition-all"
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
           >
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Autenticando...</span>
+                <span>Autenticando con Firebase...</span>
               </>
             ) : (
               <>
@@ -249,21 +273,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
               <button
                 type="button"
                 onClick={() => handleSocial('google')}
-                className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-semibold text-center transition-colors flex items-center justify-center gap-1.5"
+                className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-semibold text-center transition-colors flex items-center justify-center gap-1.5 cursor-pointer hover:border-amber-500/40"
               >
                 <span>Google</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSocial('microsoft')}
-                className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-semibold text-center transition-colors flex items-center justify-center gap-1.5"
+                className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-semibold text-center transition-colors flex items-center justify-center gap-1.5 cursor-pointer hover:border-amber-500/40"
               >
                 <span>Microsoft</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSocial('github')}
-                className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-semibold text-center transition-colors flex items-center justify-center gap-1.5"
+                className="py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-300 font-semibold text-center transition-colors flex items-center justify-center gap-1.5 cursor-pointer hover:border-amber-500/40"
               >
                 <span>GitHub</span>
               </button>
@@ -275,7 +299,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
           <div className="text-center pt-2">
             <button
               onClick={() => { setMode('login'); setErrorMessage(null); setSuccessMessage(null); }}
-              className="text-xs text-amber-400 hover:underline"
+              className="text-xs text-amber-400 hover:underline cursor-pointer"
             >
               ← Volver a Iniciar Sesión
             </button>

@@ -92,11 +92,21 @@ ${user.name} - ${user.title}`;
   };
 
   const handleOpenWhatsApp = (apt: Appointment) => {
-    const patient = patients.find(p => p.id === apt.patientId);
-    const phone = patient?.phone.replace(/[^0-9]/g, '') || '';
-    const msg = encodeURIComponent(getWhatsAppMessage(apt));
-    onMarkReminderSent(apt.id);
-    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+    try {
+      const patient = patients.find(p => p.id === apt.patientId);
+      const phone = patient?.phone.replace(/[^0-9]/g, '') || '';
+      const msg = encodeURIComponent(getWhatsAppMessage(apt));
+      onMarkReminderSent(apt.id);
+      const a = document.createElement('a');
+      a.href = `https://wa.me/${phone}?text=${msg}`;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (_e) {
+      // Safe fallback
+    }
   };
 
   return (

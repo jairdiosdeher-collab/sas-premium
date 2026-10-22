@@ -15,6 +15,7 @@ import {
   FileText
 } from 'lucide-react';
 import { Patient, AssessmentResult, ClinicalScaleType } from '../../types';
+import { useToast } from '../../context/ToastContext';
 
 interface AssessmentsModuleProps {
   patients: Patient[];
@@ -27,6 +28,7 @@ export const AssessmentsModule: React.FC<AssessmentsModuleProps> = ({
   assessments,
   onSaveAssessment,
 }) => {
+  const { showSuccess } = useToast();
   const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0]?.id || '');
   const [activeScale, setActiveScale] = useState<ClinicalScaleType>('PHQ9');
   const [answers, setAnswers] = useState<Record<number, number>>({});
@@ -210,7 +212,7 @@ export const AssessmentsModule: React.FC<AssessmentsModuleProps> = ({
   const handleSaveToRecord = () => {
     if (justCalculated) {
       onSaveAssessment(justCalculated);
-      alert('Evaluación guardada exitosamente en el expediente.');
+      showSuccess('Evaluación Guardada', `Escala ${currentDef.title} registrada exitosamente en el expediente.`);
       setAnswers({});
       setJustCalculated(null);
     }

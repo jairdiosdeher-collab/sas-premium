@@ -19,6 +19,7 @@ import { UserProfile, Patient, SoapNote, AssessmentResult, Appointment, Sermon, 
 import { AuditService } from '../../services/auditService';
 import { ExportService } from '../../services/exportService';
 import { FirebaseService, FirebaseConfigState } from '../../services/firebaseService';
+import { useToast } from '../../context/ToastContext';
 
 interface SettingsModuleProps {
   user: UserProfile;
@@ -45,6 +46,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
   onImportAllData,
   onResetFactoryData,
 }) => {
+  const { showSuccess, showError } = useToast();
   const [profileData, setProfileData] = useState<UserProfile>(user);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'backups' | 'audit' | 'firebase'>('profile');
@@ -89,7 +91,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
   const handleSaveFirebaseConfig = (e: React.FormEvent) => {
     e.preventDefault();
     FirebaseService.saveConfig(firebaseConfig);
-    alert('Configuración de Firebase guardada. El sistema sincronizará automáticamente.');
+    showSuccess('Configuración Firebase Guardada', 'El sistema sincronizará automáticamente con las nuevas credenciales.');
   };
 
   const handleExportPatientsCsv = () => {
@@ -107,13 +109,13 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.patients && parsed.notes) {
           onImportAllData(parsed);
-          alert('¡Copia de seguridad restaurada correctamente!');
+          showSuccess('Respaldo Restaurado', '¡Copia de seguridad restaurada correctamente en el sistema!');
           AuditService.log('EDITAR_EXPEDIENTE', 'Restauración de Copia', 'Base de datos restaurada desde archivo JSON.', profileData.name);
         } else {
-          alert('El archivo no contiene un formato de respaldo válido de PastoralMente AI.');
+          showError('Formato Inválido', 'El archivo no contiene un formato de respaldo válido de PastoralMente AI.');
         }
       } catch (err) {
-        alert('Error al leer el archivo JSON.');
+        showError('Error de Lectura', 'Error al procesar el archivo JSON de respaldo.');
       }
     };
     reader.readAsText(file);

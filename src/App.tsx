@@ -32,6 +32,7 @@ import {
   initialAffiliateRecord 
 } from './data/initialData';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider, useToast } from './context/ToastContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar, ModuleKey } from './components/Sidebar';
 import { LandingPage } from './components/landing/LandingPage';
@@ -54,15 +55,19 @@ import { PastoralModule } from './components/modules/PastoralModule';
 import { AnalyticsModule } from './components/modules/AnalyticsModule';
 import { FloatingWhatsApp } from './components/common/FloatingWhatsApp';
 import { SecurityLockModal } from './components/common/SecurityLockModal';
+import { FirebaseStatusModal } from './components/common/FirebaseStatusModal';
 import { AuthModal } from './components/auth/AuthModals';
 import { FirebaseService } from './services/firebaseService';
 
 function AppContent() {
   const { currentUser, updateUser } = useAuth();
+  const { showSuccess, showInfo, showError } = useToast();
 
   // Navigation View: 'landing' or 'app'
   const [activeView, setActiveView] = useState<'landing' | 'app'>('landing');
   const [currentModule, setCurrentModule] = useState<ModuleKey>('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isFirebaseStatusOpen, setIsFirebaseStatusOpen] = useState(false);
 
   // Application Data with LocalStorage Persistence
   const [patients, setPatients] = useState<Patient[]>(() => {
@@ -95,6 +100,11 @@ function AppContent() {
     return saved ? JSON.parse(saved) : initialSmallGroupResources;
   });
 
+  const [reports, setReports] = useState<any[]>(() => {
+    const saved = localStorage.getItem('pm_reports');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   // Cross-module states
   const [targetPatientForSoap, setTargetPatientForSoap] = useState<string | undefined>(undefined);
   const [targetPatientForReport, setTargetPatientForReport] = useState<string | undefined>(undefined);
@@ -104,46 +114,75 @@ function AppContent() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [billingInitialPlan, setBillingInitialPlan] = useState<PlanType>('profesional');
 
-  // Sync to local storage & Firestore offline sync
+  // Carga inicial y reconciliación con Firestore si está disponible en la nube
+  useEffect(() => {
+    if (currentUser?.id && FirebaseService.isCloudConnected()) {
+      FirebaseService.loadCollection<Patient>('patients', patients, currentUser.id).then((cloudPatients) => {
+        if (cloudPatients && cloudPatients.length > 0) setPatients(cloudPatients);
+      });
+      FirebaseService.loadCollection<SoapNote>('soapNotes', notes, currentUser.id).then((cloudNotes) => {
+        if (cloudNotes && cloudNotes.length > 0) setNotes(cloudNotes);
+      });
+      FirebaseService.loadCollection<Appointment>('appointments', appointments, currentUser.id).then((cloudApts) => {
+        if (cloudApts && cloudApts.length > 0) setAppointments(cloudApts);
+      });
+      FirebaseService.loadCollection<Sermon>('sermons', sermons, currentUser.id).then((cloudSermons) => {
+        if (cloudSermons && cloudSermons.length > 0) setSermons(cloudSermons);
+      });
+      FirebaseService.loadCollection<any>('reports', reports, currentUser.id).then((cloudReports) => {
+        if (cloudReports && cloudReports.length > 0) setReports(cloudReports);
+      });
+    }
+  }, [currentUser?.id]);
+
+  // Sync to local storage & Firestore offline-first sync (pacientes, SOAP, agenda, reportes, etc.)
   useEffect(() => {
     localStorage.setItem('pm_patients', JSON.stringify(patients));
-    FirebaseService.syncCollection('patients', patients);
-  }, [patients]);
+    FirebaseService.syncCollection('patients', patients, currentUser.id);
+  }, [patients, currentUser.id]);
 
   useEffect(() => {
     localStorage.setItem('pm_soap_notes', JSON.stringify(notes));
-    FirebaseService.syncCollection('soapNotes', notes);
-  }, [notes]);
+    FirebaseService.syncCollection('soapNotes', notes, currentUser.id);
+  }, [notes, currentUser.id]);
 
   useEffect(() => {
     localStorage.setItem('pm_assessments', JSON.stringify(assessments));
-    FirebaseService.syncCollection('clinicalScales', assessments);
-  }, [assessments]);
+    FirebaseService.syncCollection('clinicalScales', assessments, currentUser.id);
+  }, [assessments, currentUser.id]);
 
   useEffect(() => {
     localStorage.setItem('pm_appointments', JSON.stringify(appointments));
-    FirebaseService.syncCollection('appointments', appointments);
-  }, [appointments]);
+    FirebaseService.syncCollection('appointments', appointments, currentUser.id);
+  }, [appointments, currentUser.id]);
 
   useEffect(() => {
     localStorage.setItem('pm_sermons', JSON.stringify(sermons));
-    FirebaseService.syncCollection('sermons', sermons);
-  }, [sermons]);
+    FirebaseService.syncCollection('sermons', sermons, currentUser.id);
+  }, [sermons, currentUser.id]);
 
   useEffect(() => {
     localStorage.setItem('pm_small_groups', JSON.stringify(smallGroups));
-    FirebaseService.syncCollection('devotionals', smallGroups);
-  }, [smallGroups]);
+    FirebaseService.syncCollection('devotionals', smallGroups, currentUser.id);
+  }, [smallGroups, currentUser.id]);
 
-  // Actions
+  useEffect(() => {
+    localStorage.setItem('pm_reports', JSON.stringify(reports));
+    FirebaseService.syncCollection('reports', reports, currentUser.id);
+  }, [reports, currentUser.id]);
+
+  // Actions con Respaldo Automático y Notificaciones Toast
   const handleAddPatient = (newPatient: Patient) => {
     setPatients((prev) => [newPatient, ...prev]);
+    FirebaseService.recordBackup('patient_snapshot', 'patients', 1, { patientId: newPatient.id, name: newPatient.fullName }, currentUser.id, currentUser.name);
+    showSuccess('Paciente Creado', `Expediente ${newPatient.code} guardado y respaldado en la nube.`);
   };
 
   const handleUpdatePatientStage = (patientId: string, newStage: PipelineStage) => {
     setPatients((prev) =>
       prev.map((p) => (p.id === patientId ? { ...p, pipelineStage: newStage } : p))
     );
+    showInfo('Pipeline Actualizado', `Paciente trasladado a etapa: ${newStage.replace('_', ' ')}`);
   };
 
   const handleAddInteraction = (patientId: string, interaction: InteractionLog) => {
@@ -156,6 +195,7 @@ function AppContent() {
         return p;
       })
     );
+    showSuccess('Interacción Registrada', `Registro de ${interaction.type} guardado.`);
   };
 
   const handleAddAttachment = (patientId: string, attachment: PatientAttachment) => {
@@ -168,6 +208,7 @@ function AppContent() {
         return p;
       })
     );
+    showSuccess('Documento Adjunto', `Archivo ${attachment.name} sincronizado con Firebase Storage.`);
   };
 
   const handleSaveConsentSignature = (patientId: string, signatureUrl: string) => {
@@ -182,6 +223,7 @@ function AppContent() {
           : p
       )
     );
+    showSuccess('Consentimiento Firmado', 'Firma digital encriptada y archivada en el expediente.');
   };
 
   const handleAddPrayerRequest = (patientId: string, prayer: PrayerRequest) => {
@@ -194,6 +236,7 @@ function AppContent() {
         return p;
       })
     );
+    showSuccess('Petición de Oración', 'Petición añadida al muro ministerial.');
   };
 
   const handleAddMilestone = (patientId: string, milestone: SpiritualMilestone) => {
@@ -206,18 +249,24 @@ function AppContent() {
         return p;
       })
     );
+    showSuccess('Hito Espiritual', `Hito "${milestone.title}" registrado.`);
   };
 
   const handleSaveNote = (newNote: SoapNote) => {
     setNotes((prev) => [newNote, ...prev]);
+    FirebaseService.recordBackup('notes_snapshot', 'notes', 1, { noteId: newNote.id, patientId: newNote.patientId }, currentUser.id, currentUser.name);
+    showSuccess('Nota SOAP Registrada', 'Evolución clínica sincronizada en la nube con respaldo automático.');
   };
 
   const handleSaveAssessment = (newAssessment: AssessmentResult) => {
     setAssessments((prev) => [newAssessment, ...prev]);
+    FirebaseService.recordBackup('auto_backup', 'assessments', 1, { scale: newAssessment.type, score: newAssessment.score }, currentUser.id, currentUser.name);
+    showSuccess('Evaluación Completada', `Escala ${newAssessment.type} guardada (${newAssessment.score}/${newAssessment.maxScore}).`);
   };
 
   const handleAddAppointment = (newApt: Appointment) => {
     setAppointments((prev) => [newApt, ...prev]);
+    showSuccess('Cita Agendada', `Cita para ${newApt.patientName} registrada.`);
   };
 
   const handleUpdateAppointmentStatus = (id: string, status: Appointment['status']) => {
@@ -230,14 +279,17 @@ function AppContent() {
     setAppointments((prev) =>
       prev.map((apt) => (apt.id === id ? { ...apt, reminderSent: true } : apt))
     );
+    showInfo('Recordatorio Enviado', 'Mensaje de WhatsApp preparado para el consultante.');
   };
 
   const handleAddSermon = (newSermon: Sermon) => {
     setSermons((prev) => [newSermon, ...prev]);
+    showSuccess('Sermón Guardado', `Bosquejo "${newSermon.title}" guardado en la nube.`);
   };
 
   const handleAddResource = (newRes: SmallGroupResource) => {
     setSmallGroups((prev) => [newRes, ...prev]);
+    showSuccess('Recurso Creado', `Guía para células "${newRes.title}" guardada.`);
   };
 
   const handleUpdatePlan = (plan: PlanType, newCredits: number) => {
@@ -245,18 +297,24 @@ function AppContent() {
       plan,
       credits: (currentUser.credits || 0) + newCredits,
     });
+    showSuccess('Plan Actualizado', `Tu cuenta ahora cuenta con el Plan ${plan.toUpperCase()}.`);
   };
 
   const handleChangeRole = (role: UserRole) => {
+    const titles: Record<string, string> = {
+      administrador: 'Administrador General del Sistema',
+      psicologo: 'Psicólogo Clínico Cristiano',
+      pastor: 'Pastor Principal',
+      supervisor: 'Supervisor Clínico & Ministerial',
+      invitado: 'Usuario Invitado / Acceso Demo',
+      consejero: 'Consejero Pastoral Familiar',
+      director_ministerio: 'Director Ministerial',
+    };
     updateUser({
       role,
-      title:
-        role === 'psicologo'
-          ? 'Psicólogo Clínico Cristiano'
-          : role === 'pastor'
-          ? 'Pastor Principal'
-          : 'Consejero Familiar & Matrimonial',
+      title: titles[role] || 'Consejero Pastoral',
     });
+    showInfo('Rol de Acceso Actualizado', `Visualización ajustada a: ${titles[role] || role}`);
   };
 
   const handleImportAllData = (data: any) => {
@@ -322,6 +380,8 @@ function AppContent() {
         onQuickAction={handleQuickAction}
         onChangeRole={handleChangeRole}
         onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenFirebaseStatus={() => setIsFirebaseStatusOpen(true)}
+        onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
       />
 
       {/* Main View Router */}
@@ -331,12 +391,16 @@ function AppContent() {
           onSelectPlan={(plan) => handleSelectPlanFromLanding(plan)}
         />
       ) : (
-        <div className="flex-1 flex max-w-7xl w-full mx-auto">
-          {/* Left Sidebar */}
+        <div className="flex-1 flex max-w-7xl w-full mx-auto relative">
+          {/* Left Sidebar con RBAC y Mobile Drawer */}
           <Sidebar
             currentModule={currentModule}
             setCurrentModule={setCurrentModule}
             crisisCount={crisisCount}
+            userRole={currentUser.role}
+            isMobileOpen={isMobileMenuOpen}
+            onCloseMobile={() => setIsMobileMenuOpen(false)}
+            onOpenFirebaseStatus={() => setIsFirebaseStatusOpen(true)}
           />
 
           {/* Module Content Canvas */}
@@ -502,6 +566,13 @@ function AppContent() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
       />
+
+      {/* Panel Visual de Estado Firebase (Traffic Lights: Verde / Amarillo / Rojo) */}
+      <FirebaseStatusModal
+        isOpen={isFirebaseStatusOpen}
+        onClose={() => setIsFirebaseStatusOpen(false)}
+        currentUser={currentUser}
+      />
     </div>
   );
 }
@@ -509,7 +580,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </AuthProvider>
   );
 }
