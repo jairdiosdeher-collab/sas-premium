@@ -1,0 +1,22 @@
+{
+  "name": "PastoralMente AI Premium",
+  "short_name": "PastoralMente",
+  "description": "Suite clínica, pastoral y homilética con IA ética para pastores y psicólogos cristianos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

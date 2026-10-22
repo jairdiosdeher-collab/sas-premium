@@ -1,0 +1,8 @@
+{
+  "name": "PastoralMente AI Premium",
+  "description": "Software integral SaaS clínico y pastoral para psicólogos cristianos, consejeros, pastores e iglesias. Historias clínicas, notas SOAP-S, escalas psicométricas, generador homilético con IA y CRM.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

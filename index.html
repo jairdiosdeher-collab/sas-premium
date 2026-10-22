@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PastoralMente AI Premium | Suite Clínica, Pastoral y Homilética</title>
+    <meta name="description" content="Software integral SaaS clínico y pastoral para psicólogos cristianos, consejeros, pastores e iglesias. Historias clínicas, notas SOAP-S, escalas psicométricas, generador homilético con IA y CRM." />
+    <meta property="og:title" content="PastoralMente AI Premium | Suite Clínica, Pastoral y Homilética" />
+    <meta property="og:description" content="Software integral SaaS clínico y pastoral para psicólogos cristianos, consejeros, pastores e iglesias. Historias clínicas, notas SOAP-S, escalas psicométricas, generador homilético con IA y CRM." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#020617" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cinzel:wght@500;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "PastoralMente AI Premium",
+      "applicationCategory": "BusinessApplication, HealthApplication",
+      "operatingSystem": "Web, iOS, Android, Windows, macOS",
+      "offers": {
+        "@type": "Offer",
+        "price": "19.00",
+        "priceCurrency": "USD"
+      },
+      "description": "Software integral SaaS clínico y pastoral para psicólogos cristianos, consejeros, pastores e iglesias."
+    }
+    </script>
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-amber-500/30 selection:text-amber-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>
+
