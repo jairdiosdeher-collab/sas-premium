@@ -12,11 +12,10 @@ import {
   firestore,
   storage,
   isFirebaseConfigured,
-  COLLECTIONS,
   onAuthStateChanged,
-  type FirebaseUser,
-  type Firestore,
 } from "../firebase";
+
+import type { User as FirebaseAuthUser } from "firebase/auth";
 
 import {
   doc,
@@ -33,6 +32,7 @@ import {
   limit,
   onSnapshot,
   serverTimestamp,
+  type Firestore,
 } from "firebase/firestore";
 
 import {
@@ -43,7 +43,6 @@ import {
 
 import type {
   UserProfile,
-  UserRole,
   BackupRecord,
   FirebaseSyncMetrics,
 } from "../types";
@@ -62,3 +61,4 @@ export type SyncStatus =
   | "cloud_connected"
   | "syncing"
   | "offline"
+  | "local_mode";
