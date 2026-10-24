@@ -8,7 +8,9 @@ import {
   Plus,
   Menu,
   Activity,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle,
+  Mic
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { FirebaseService } from '../services/firebaseService';
@@ -23,6 +25,9 @@ interface NavbarProps {
   onOpenAuth: () => void;
   onOpenFirebaseStatus?: () => void;
   onToggleMobileMenu?: () => void;
+  onOpenAlerts?: () => void;
+  activeAlertsCount?: number;
+  onOpenVoiceDictation?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -35,6 +40,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onOpenFirebaseStatus,
   onToggleMobileMenu,
+  onOpenAlerts,
+  activeAlertsCount = 0,
+  onOpenVoiceDictation,
 }) => {
   const [syncInfo, setSyncInfo] = useState(FirebaseService.getStatusLabel());
 
@@ -150,6 +158,35 @@ export const Navbar: React.FC<NavbarProps> = ({
               {user.plan === 'basico' ? '$19/m' : user.plan === 'profesional' ? '$49/m' : '$99/m'}
             </span>
           </button>
+
+          {/* Voice Dictation Button */}
+          {activeView === 'app' && onOpenVoiceDictation && (
+            <button
+              onClick={onOpenVoiceDictation}
+              title="Dictado Clínico por Voz (Speech-to-Text SOAP-S)"
+              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            >
+              <Mic className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+              <span className="hidden lg:inline">Voz SOAP</span>
+            </button>
+          )}
+
+          {/* Smart Alerts Drawer Button */}
+          {activeView === 'app' && onOpenAlerts && (
+            <button
+              onClick={onOpenAlerts}
+              title="Centro de Alertas Clínicas y Pastorales"
+              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-sm cursor-pointer ${
+                activeAlertsCount > 0
+                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30 animate-pulse'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+              <span className="font-bold">{activeAlertsCount}</span>
+              <span className="hidden lg:inline text-[11px]">Alertas</span>
+            </button>
+          )}
 
           {/* Quick Action Button */}
           {activeView === 'app' && (

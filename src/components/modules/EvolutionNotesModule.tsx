@@ -12,11 +12,15 @@ import {
   BookOpen,
   Send,
   Loader2,
-  Plus
+  Plus,
+  ShieldCheck,
+  Mic
 } from 'lucide-react';
 import { Patient, SoapNote, UserProfile } from '../../types';
 import { callGeminiApi } from '../../services/geminiService';
 import { useToast } from '../../context/ToastContext';
+import { ClinicalSupervisorModal } from './ClinicalSupervisorModal';
+import { VoiceDictationModal } from '../common/VoiceDictationModal';
 
 interface EvolutionNotesModuleProps {
   user: UserProfile;
@@ -51,6 +55,8 @@ export const EvolutionNotesModule: React.FC<EvolutionNotesModuleProps> = ({
   const [rawRoughNotes, setRawRoughNotes] = useState<string>('');
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
+  const [isSupervisorOpen, setIsSupervisorOpen] = useState(false);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
 
   const patientNotes = notes.filter((n) => n.patientId === currentPatientId);
   const currentPatient = patients.find((p) => p.id === currentPatientId);
@@ -199,28 +205,38 @@ Entrega el formato con lenguaje clínico riguroso pero con profunda sensibilidad
               className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
             />
 
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[10px] text-slate-400">
                 La IA transformará esto en las 5 secciones estructuradas con terminología clínica y bíblica.
               </p>
-              <button
-                type="button"
-                onClick={handleGenerateAiSoap}
-                disabled={isAiLoading}
-                className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all disabled:opacity-50"
-              >
-                {isAiLoading ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Sintetizando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Sintetizar en SOAP-S</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsVoiceOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 text-xs font-semibold flex items-center gap-1.5 transition"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Dictar por Voz</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateAiSoap}
+                  disabled={isAiLoading}
+                  className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all disabled:opacity-50"
+                >
+                  {isAiLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Sintetizando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Sintetizar en SOAP-S</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {aiSuccessMessage && (
@@ -351,13 +367,25 @@ Entrega el formato con lenguaje clínico riguroso pero con profunda sensibilidad
                 Firma: <strong className="text-slate-200">{user.name}</strong> ({user.title})
               </p>
 
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
-              >
-                <Save className="w-4 h-4" />
-                <span>Guardar Nota en Expediente</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSupervisorOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-semibold flex items-center gap-1.5 transition"
+                  title="Auditoría ética, contradicciones diagnósticas y DSM-5"
+                >
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  <span>Supervisora Clínica</span>
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Guardar Nota en Expediente</span>
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -409,6 +437,41 @@ Entrega el formato con lenguaje clínico riguroso pero con profunda sensibilidad
           </div>
         </div>
       </div>
+
+      {/* Clinical Supervisor Modal */}
+      <ClinicalSupervisorModal
+        isOpen={isSupervisorOpen}
+        onClose={() => setIsSupervisorOpen(false)}
+        note={{
+          subjective,
+          objective,
+          assessment,
+          plan,
+          spiritualDimension,
+          riskFlag,
+        }}
+        patient={currentPatient}
+        onApplyRecommendations={(enriched) => {
+          if (enriched.plan) setPlan(enriched.plan);
+          if (enriched.spiritualDimension) setSpiritualDimension(enriched.spiritualDimension);
+          showSuccess('Recomendaciones Aplicadas', 'El plan y la dimensión espiritual han sido enriquecidos.');
+        }}
+      />
+
+      {/* Voice Dictation Modal */}
+      <VoiceDictationModal
+        isOpen={isVoiceOpen}
+        onClose={() => setIsVoiceOpen(false)}
+        patientName={currentPatient?.fullName || 'Consultante'}
+        onApplyParsedSoap={(parsed) => {
+          if (parsed.subjective) setSubjective(parsed.subjective);
+          if (parsed.objective) setObjective(parsed.objective);
+          if (parsed.assessment) setAssessment(parsed.assessment);
+          if (parsed.plan) setPlan(parsed.plan);
+          if (parsed.spiritualDimension) setSpiritualDimension(parsed.spiritualDimension);
+          showSuccess('Dictado Aplicado', 'Secciones S-O-A-P-S transferidas al formulario.');
+        }}
+      />
     </div>
   );
 };

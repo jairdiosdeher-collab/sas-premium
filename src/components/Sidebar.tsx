@@ -33,6 +33,10 @@ export type ModuleKey =
   | 'evolution'
   | 'assessments'
   | 'calendar'
+  | 'tasks'
+  | 'portal'
+  | 'documents'
+  | 'library'
   | 'sermons'
   | 'smallgroups'
   | 'pastoral'
@@ -68,31 +72,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const roleAllowedModules: Record<string, ModuleKey[]> = {
     administrador: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
-      'assessments', 'calendar', 'sermons', 'smallgroups', 'pastoral', 
-      'aistudio', 'reports', 'analytics', 'marketing', 'affiliates', 'settings'
+      'assessments', 'calendar', 'tasks', 'portal', 'documents', 'library',
+      'sermons', 'smallgroups', 'pastoral', 'aistudio', 'reports', 'analytics', 
+      'marketing', 'affiliates', 'settings'
     ],
     psicologo: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
-      'assessments', 'calendar', 'aistudio', 'reports', 'settings'
+      'assessments', 'calendar', 'tasks', 'portal', 'documents', 'library',
+      'aistudio', 'reports', 'settings'
     ],
     pastor: [
-      'dashboard', 'crm_pipeline', 'patients', 'timeline', 'calendar', 
-      'sermons', 'smallgroups', 'pastoral', 'aistudio', 'reports', 'settings'
+      'dashboard', 'crm_pipeline', 'patients', 'timeline', 'calendar', 'tasks',
+      'portal', 'documents', 'library', 'sermons', 'smallgroups', 'pastoral',
+      'aistudio', 'reports', 'settings'
     ],
     supervisor: [
-      'dashboard', 'patients', 'timeline', 'evolution', 'assessments', 
-      'reports', 'analytics', 'settings'
+      'dashboard', 'patients', 'timeline', 'evolution', 'assessments', 'tasks',
+      'documents', 'library', 'reports', 'analytics', 'settings'
     ],
     invitado: [
-      'dashboard', 'sermons', 'smallgroups', 'aistudio', 'marketing'
+      'dashboard', 'sermons', 'smallgroups', 'library', 'aistudio', 'marketing'
     ],
     consejero: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
-      'calendar', 'pastoral', 'aistudio', 'reports', 'settings'
+      'calendar', 'tasks', 'portal', 'library', 'pastoral', 'aistudio', 'reports', 'settings'
     ],
     director_ministerio: [
-      'dashboard', 'crm_pipeline', 'patients', 'calendar', 'sermons', 
-      'smallgroups', 'pastoral', 'analytics', 'settings'
+      'dashboard', 'crm_pipeline', 'patients', 'calendar', 'tasks', 'library',
+      'sermons', 'smallgroups', 'pastoral', 'analytics', 'settings'
     ],
   };
 
@@ -110,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { key: 'dashboard', label: 'Dashboard General', icon: LayoutDashboard, category: 'clinico' },
     { key: 'crm_pipeline', label: 'CRM & Pipeline Visual', icon: GitPullRequest, category: 'clinico', badge: 'Kanban' },
     { key: 'patients', label: 'Historias Clínicas & CRM', icon: Users, category: 'clinico' },
-    { key: 'timeline', label: 'Timeline & Adjuntos', icon: Clock, category: 'clinico', badge: 'Docs' },
+    { key: 'timeline', label: 'Timeline Integral (8D)', icon: Clock, category: 'clinico', badge: 'Docs' },
     { key: 'evolution', label: 'Notas de Evolución (SOAP-S)', icon: FileText, category: 'clinico' },
     { 
       key: 'assessments', 
@@ -120,10 +127,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: crisisCount > 0 ? `${crisisCount} Alertas` : '9 Escalas',
       badgeColor: crisisCount > 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : undefined
     },
+    { key: 'tasks', label: 'Tareas & Seguimiento', icon: ShieldCheck, category: 'clinico', badge: 'Metas' },
+    { key: 'portal', label: 'Portal del Paciente', icon: Heart, category: 'clinico', badge: 'Token' },
+    { key: 'documents', label: 'Centro Documental', icon: Cloud, category: 'clinico', badge: 'Storage' },
     { key: 'calendar', label: 'Agenda & WhatsApp', icon: Calendar, category: 'clinico' },
 
     // Ministerial & Homilético
-    { key: 'sermons', label: 'Homilética & Sermones con IA', icon: BookOpen, category: 'pastoral', badge: 'IA v3.8' },
+    { key: 'sermons', label: 'Productor de Sermones 10.0', icon: BookOpen, category: 'pastoral', badge: 'IA v10' },
+    { key: 'library', label: 'Biblioteca Clínica & Pastoral', icon: BookOpen, category: 'pastoral', badge: '7 Dominios' },
     { key: 'smallgroups', label: 'Grupos Pequeños & Células', icon: UsersRound, category: 'pastoral' },
     { key: 'pastoral', label: 'Dirección Espiritual & Escuela', icon: Heart, category: 'pastoral', badge: 'Ficha' },
     { key: 'aistudio', label: 'Estudio de IA & Preguntas', icon: Bot, category: 'pastoral' },

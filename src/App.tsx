@@ -53,6 +53,13 @@ import { PipelineCrmModule } from './components/modules/PipelineCrmModule';
 import { ClinicalTimelineModule } from './components/modules/ClinicalTimelineModule';
 import { PastoralModule } from './components/modules/PastoralModule';
 import { AnalyticsModule } from './components/modules/AnalyticsModule';
+import { PatientPortalModule } from './components/modules/PatientPortalModule';
+import { DocumentCenterModule } from './components/modules/DocumentCenterModule';
+import { ClinicalLibraryModule } from './components/modules/ClinicalLibraryModule';
+import { TasksAndFollowupModule } from './components/modules/TasksAndFollowupModule';
+import { SmartAlertsDrawer } from './components/common/SmartAlertsDrawer';
+import { VoiceDictationModal } from './components/common/VoiceDictationModal';
+import { AlertsService } from './services/alertsService';
 import { FloatingWhatsApp } from './components/common/FloatingWhatsApp';
 import { SecurityLockModal } from './components/common/SecurityLockModal';
 import { FirebaseStatusModal } from './components/common/FirebaseStatusModal';
@@ -68,6 +75,8 @@ function AppContent() {
   const [currentModule, setCurrentModule] = useState<ModuleKey>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFirebaseStatusOpen, setIsFirebaseStatusOpen] = useState(false);
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isVoiceDictationOpen, setIsVoiceDictationOpen] = useState(false);
 
   // Application Data with LocalStorage Persistence
   const [patients, setPatients] = useState<Patient[]>(() => {
@@ -361,10 +370,12 @@ function AppContent() {
     setIsBillingOpen(true);
   };
 
-  // Crisis Count
+  // Crisis Count & Smart Alerts
   const crisisCount = patients.filter(
     (p) => p.riskLevel === 'alto' || p.riskLevel === 'urgente' || p.status === 'en_crisis'
   ).length;
+
+  const smartAlerts = AlertsService.computeSmartAlerts(patients, notes, assessments, appointments);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -382,6 +393,9 @@ function AppContent() {
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenFirebaseStatus={() => setIsFirebaseStatusOpen(true)}
         onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
+        onOpenAlerts={() => setIsAlertsOpen(true)}
+        activeAlertsCount={smartAlerts.length}
+        onOpenVoiceDictation={() => setIsVoiceDictationOpen(true)}
       />
 
       {/* Main View Router */}
@@ -444,6 +458,8 @@ function AppContent() {
                 patients={patients}
                 notes={notes}
                 assessments={assessments}
+                appointments={appointments}
+                sermons={sermons}
                 onAddAttachment={handleAddAttachment}
                 onSaveConsentSignature={handleSaveConsentSignature}
               />
@@ -476,6 +492,26 @@ function AppContent() {
                 onUpdateAppointmentStatus={handleUpdateAppointmentStatus}
                 onMarkReminderSent={handleMarkReminderSent}
               />
+            )}
+
+            {currentModule === 'tasks' && (
+              <TasksAndFollowupModule patients={patients} />
+            )}
+
+            {currentModule === 'portal' && (
+              <PatientPortalModule
+                patients={patients}
+                appointments={appointments}
+                assessments={assessments}
+              />
+            )}
+
+            {currentModule === 'documents' && (
+              <DocumentCenterModule patients={patients} />
+            )}
+
+            {currentModule === 'library' && (
+              <ClinicalLibraryModule />
             )}
 
             {currentModule === 'sermons' && (
@@ -572,6 +608,28 @@ function AppContent() {
         isOpen={isFirebaseStatusOpen}
         onClose={() => setIsFirebaseStatusOpen(false)}
         currentUser={currentUser}
+      />
+
+      {/* Smart Alerts Drawer */}
+      <SmartAlertsDrawer
+        isOpen={isAlertsOpen}
+        onClose={() => setIsAlertsOpen(false)}
+        alerts={smartAlerts}
+        onSelectPatient={(patientId) => {
+          setTargetPatientForSoap(patientId);
+          setCurrentModule('patients');
+        }}
+      />
+
+      {/* Voice Dictation Modal */}
+      <VoiceDictationModal
+        isOpen={isVoiceDictationOpen}
+        onClose={() => setIsVoiceDictationOpen(false)}
+        patientName={patients[0]?.fullName || 'Consultante'}
+        onApplyParsedSoap={(parsed) => {
+          showSuccess('Dictado Convertido a SOAP', 'Estructura SOAP-S lista para archivar en evolución.');
+          setCurrentModule('evolution');
+        }}
       />
     </div>
   );

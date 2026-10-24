@@ -19,10 +19,15 @@ import {
   Heart,
   Maximize2,
   X,
-  ChevronLeft
+  ChevronLeft,
+  BookMarked,
+  Clock,
+  User,
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
-import { Sermon, UserProfile, HomileticSlide } from '../../types';
-import { callGeminiApi } from '../../services/geminiService';
+import { Sermon, SermonType, UserProfile, HomileticSlide } from '../../types';
+import { SermonGeneratorService } from '../../services/sermonGeneratorService';
 import { useToast } from '../../context/ToastContext';
 
 interface SermonsModuleProps {
@@ -36,7 +41,7 @@ export const SermonsModule: React.FC<SermonsModuleProps> = ({
   sermons,
   onAddSermon,
 }) => {
-  const { showSuccess } = useToast();
+  const { showSuccess, showInfo } = useToast();
   const [selectedSermon, setSelectedSermon] = useState<Sermon | null>(sermons[0] || null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
@@ -47,33 +52,39 @@ export const SermonsModule: React.FC<SermonsModuleProps> = ({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isFullscreenSlides, setIsFullscreenSlides] = useState(false);
 
-  // Generator inputs
-  const [mainPassage, setMainPassage] = useState('Salmo 23:1-6 & Juan 10:11-15');
-  const [theme, setTheme] = useState('El Buen Pastor en Tiempos de Incertidumbre y Escasez');
-  const [seriesName, setSeriesName] = useState('Descanso para el Alma');
-  const [targetAudience, setTargetAudience] = useState('Familias, jóvenes y profesionales bajo estrés');
+  // Generator inputs - Formulario Homilético Completo
+  const [mainPassage, setMainPassage] = useState('Efesios 2:1-10');
+  const [theme, setTheme] = useState('La Gracia de Dios que Transforma el Corazón');
+  const [sermonType, setSermonType] = useState<SermonType>('expositivo');
+  const [seriesName, setSeriesName] = useState('Fundamentos de la Fe');
+  const [targetAudience, setTargetAudience] = useState('Congregación General y Nuevos Creyentes');
+  const [objective, setObjective] = useState('Que la congregación descanse en la suficiencia de la gracia de Dios y viva con gratitud activa.');
+  const [theologicalFocus, setTheologicalFocus] = useState('Justificación por fe y soberanía bondadosa de Cristo');
+  const [bibleTranslation, setBibleTranslation] = useState('RVR1960');
+  const [estimatedDurationMinutes, setEstimatedDurationMinutes] = useState(35);
   const [isLoading, setIsLoading] = useState(false);
 
   const filteredSermons = sermons.filter(s => 
     s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.mainPassage.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()))
+    (s.tags && s.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()))) ||
+    (s.sermonType && s.sermonType.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // Generador de diapositivas automáticas basadas en el sermón seleccionado
+  // Generador de diapositivas dinámicas basadas en los puntos reales del sermón seleccionado
   const generateSlides = (sermon: Sermon): HomileticSlide[] => {
     return [
       {
         slideNumber: 1,
         title: sermon.title,
-        subtitle: `Serie: ${sermon.series || 'Predicación Expositiva'}`,
+        subtitle: `Tipo: ${(sermon.sermonType || 'Expositivo').toUpperCase()} • ${sermon.series || 'Mensaje Bíblico'}`,
         scriptureReference: sermon.mainPassage,
         contentBulletPoints: [
-          `Pasaje Bíblico: ${sermon.mainPassage}`,
+          `Pasaje: ${sermon.mainPassage}`,
           `Propósito: ${sermon.objective}`,
-          `PastoralMente Proyección Digital`
+          `Versión: ${sermon.bibleTranslation || 'RVR1960'}`
         ],
-        speakerNotes: 'Introducir con la historia y capturar la atención de la audiencia.'
+        speakerNotes: 'Introducción del tema y captura de la atención de la congregación.'
       },
       {
         slideNumber: 2,
@@ -83,7 +94,7 @@ export const SermonsModule: React.FC<SermonsModuleProps> = ({
         contentBulletPoints: [
           `"${sermon.homileticalIdea}"`
         ],
-        speakerNotes: 'Repetir la idea central con claridad e invitar a la congregación a memorizarla.'
+        speakerNotes: 'Declarar la proposición central con convicción y claridad.'
       },
       ...sermon.points.map((pt, idx) => ({
         slideNumber: idx + 3,
@@ -91,11 +102,11 @@ export const SermonsModule: React.FC<SermonsModuleProps> = ({
         subtitle: `Punto ${idx + 1}`,
         scriptureReference: sermon.mainPassage,
         contentBulletPoints: [
-          `Exégesis: ${pt.scriptureExplanation}`,
-          `Ilustración: ${pt.contemporaryIllustration}`,
-          `Aplicación: ${pt.practicalApplication}`
+          `Exégesis: ${pt.scriptureExplanation.substring(0, 160)}${pt.scriptureExplanation.length > 160 ? '...' : ''}`,
+          `Ilustración: ${pt.contemporaryIllustration.substring(0, 140)}${pt.contemporaryIllustration.length > 140 ? '...' : ''}`,
+          `Aplicación: ${pt.practicalApplication.substring(0, 140)}${pt.practicalApplication.length > 140 ? '...' : ''}`
         ],
-        speakerNotes: `Énfasis pastoral en la aplicación personal para la semana.`
+        speakerNotes: `Énfasis pastoral en la aplicación concreta para la vida diaria.`
       })),
       {
         slideNumber: sermon.points.length + 3,
@@ -106,7 +117,7 @@ export const SermonsModule: React.FC<SermonsModuleProps> = ({
           sermon.conclusion,
           `Llamado: ${sermon.callToAction}`
         ],
-        speakerNotes: 'Espacio para oración guiada y ministración del Espíritu Santo.'
+        speakerNotes: 'Llamado al altar y oración de entrega comunitaria.'
       }
     ];
   };
@@ -115,85 +126,75 @@ export const SermonsModule: React.FC<SermonsModuleProps> = ({
 
   const handleGenerateAiSermon = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!theme.trim() || !mainPassage.trim()) {
+      return;
+    }
     setIsLoading(true);
 
-    const prompt = `Actúa como un profesor de homilética y teología bíblica (Motor Homilético 10.0).
-Crea un sermón exegético completo y de impacto con la siguiente información:
-- Pasaje Bíblico Principal: ${mainPassage}
-- Tema / Propósito: ${theme}
-- Serie: ${seriesName}
-- Audiencia Objetivo: ${targetAudience}
+    try {
+      const generated = await SermonGeneratorService.generateSermon({
+        theme: theme.trim(),
+        mainPassage: mainPassage.trim(),
+        sermonType,
+        seriesName: seriesName.trim(),
+        targetAudience: targetAudience.trim(),
+        objective: objective.trim(),
+        theologicalFocus: theologicalFocus.trim(),
+        bibleTranslation,
+        estimatedDurationMinutes: Number(estimatedDurationMinutes) || 35,
+      });
 
-Estructura:
-1. Título homilético memorable.
-2. Idea Homilética Central.
-3. Introducción contemporánea.
-4. 3 Puntos Principales con Explicación (raíces en griego o hebreo), Ilustración contemporánea y Aplicación práctica.
-5. Conclusión y Llamado al altar cristocéntrico.`;
+      onAddSermon(generated);
+      setSelectedSermon(generated);
+      setIsGeneratorOpen(false);
+      setCurrentSlideIndex(0);
 
-    const result = await callGeminiApi(prompt);
-    setIsLoading(false);
+      const sourceLabel = generated.generationSource === 'gemini-live' 
+        ? 'IA Gemini en Vivo' 
+        : 'Motor Hermenéutico Contextual';
 
-    const newSermon: Sermon = {
-      id: `ser-${Date.now()}`,
-      title: theme,
-      series: seriesName,
-      mainPassage,
-      supportingPassages: ["Romanos 8:28", "Filipenses 4:19"],
-      homileticalIdea: "Cuando Cristo es verdaderamente nuestro Pastor, la escasez del mundo pierde su poder para quitarnos la paz.",
-      objective: "Llevar a la congregación a descansar en la providencia soberana de Dios.",
-      introduction: result.text.slice(0, 350) + "...",
-      points: [
-        {
-          title: "1. La suficiencia del Pastor (Salmo 23:1)",
-          scriptureExplanation: "El nombre divino Jehová-Rohi revela un Dios que camina en medio de sus ovejas con compasión inextinguible.",
-          contemporaryIllustration: "Un niño que camina en un aeropuerto caótico de la mano de su padre: no entiende el ruido, pero descansa en quien lo guía.",
-          practicalApplication: "Haz una pausa al despertar y declara: 'El Señor es mi Pastor, nada me faltará hoy'."
-        },
-        {
-          title: "2. La mesa servida en presencia de angustiadores (Salmo 23:5)",
-          scriptureExplanation: "En el antiguo Oriente Próximo, el anfitrión ofrecía asilo inviolable al comensal en su tienda.",
-          contemporaryIllustration: "Cenar en paz en un hogar cálido mientras afuera ruge una tempestad violenta.",
-          practicalApplication: "Identifica a tus 'angustiadores' actuales y descansa en la mesa de sus promesas."
-        },
-        {
-          title: "3. La persecución de la bondad y la misericordia (Salmo 23:6)",
-          scriptureExplanation: "El verbo hebreo 'radaph' significa perseguir con celo. La misericordia de Dios nos persigue activamente.",
-          contemporaryIllustration: "Dos perros pastores experimentados que no permiten que ninguna oveja se despeñe en el abismo.",
-          practicalApplication: "Agradece por los caminos que Dios cerró para preservar tu vida espiritual."
-        }
-      ],
-      conclusion: "El Buen Pastor entregó su vida por ti. Nada puede separarte de su amor eterno.",
-      callToAction: "Pasa al frente si deseas entregar tus cargas y recibir su descanso.",
-      tags: ["Esperanza", "Provisión", "Salmos", "Paz", "Fe"],
-      dateCreated: new Date().toISOString().split('T')[0],
-      targetAudience,
-    };
-
-    onAddSermon(newSermon);
-    setSelectedSermon(newSermon);
-    setIsGeneratorOpen(false);
-    showSuccess('Sermón 10.0 Generado', `Bosquejo, exégesis y diapositivas listos para púlpito.`);
+      showSuccess(
+        'Sermón Generado Exitosamente',
+        `"${generated.title}" creado con puntos y exégesis específicos (${sourceLabel}).`
+      );
+    } catch (err: any) {
+      console.error('Error generando sermón:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCopySermon = () => {
     if (!selectedSermon) return;
     const text = `TÍTULO: ${selectedSermon.title}
-PASAJE: ${selectedSermon.mainPassage}
+PASAJE: ${selectedSermon.mainPassage} (${selectedSermon.bibleTranslation || 'RVR1960'})
+GÉNERO / TIPO: ${(selectedSermon.sermonType || 'expositivo').toUpperCase()}
 SERIE: ${selectedSermon.series || 'General'}
-IDEA CENTRAL: ${selectedSermon.homileticalIdea}
+DURACIÓN: ${selectedSermon.estimatedDurationMinutes || 35} minutos
+
+IDEA HOMILÉTICA CENTRAL:
+"${selectedSermon.homileticalIdea}"
+
+OBJETIVO ESPIRITUAL:
+${selectedSermon.objective}
+
+CONTEXTO HISTÓRICO Y LITERARIO:
+${selectedSermon.historicalContext || 'Contextualizado según el texto bíblico.'}
 
 INTRODUCCIÓN:
 ${selectedSermon.introduction}
 
-DESARROLLO:
-${selectedSermon.points.map((p, i) => `${p.title}\n- Exégesis: ${p.scriptureExplanation}\n- Ilustración: ${p.contemporaryIllustration}\n- Aplicación: ${p.practicalApplication}`).join('\n\n')}
+DESARROLLO HOMILÉTICO:
+${selectedSermon.points.map((p) => `${p.title}\n- Exégesis Bíblica: ${p.scriptureExplanation}\n- Ilustración Contemporánea: ${p.contemporaryIllustration}\n- Aplicación Práctica del Lunes: ${p.practicalApplication}`).join('\n\n')}
 
-CONCLUSIÓN:
+CONCLUSIÓN CRISTOCÉNTRICA:
 ${selectedSermon.conclusion}
 
-LLAMADO:
-${selectedSermon.callToAction}`;
+LLAMADO AL ALTAR:
+${selectedSermon.callToAction}
+
+PASAJES DE APOYO:
+${(selectedSermon.supportingPassages || []).join(', ')}`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -207,16 +208,16 @@ ${selectedSermon.callToAction}`;
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Pilar 10 &bull; Homilética de Alta Fidelidad
+              Productor Homilético 10.0 &bull; Exégesis Real y Contextual
             </span>
-            <span className="text-xs text-slate-400">Exégesis, Diapositivas & Células</span>
+            <span className="text-xs text-slate-400">Sin plantillas fijas &bull; Adaptado al Pasaje</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2 mt-1">
             <BookOpen className="w-6 h-6 text-amber-400" />
-            <span>Motor de Sermones 10.0 con IA</span>
+            <span>Productor de Sermones & Biblioteca Homilética</span>
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Exégesis en griego/hebreo, contexto cultural, 3 puntos con ilustraciones, preguntas para grupos pequeños y presentaciones automáticas.
+            Generador bíblico con exégesis en griego/hebreo, ilustraciones originales, preguntas para grupos pequeños y diapositivas de proyección.
           </p>
         </div>
 
@@ -225,20 +226,20 @@ ${selectedSermon.callToAction}`;
           className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
         >
           <Sparkles className="w-4 h-4 fill-slate-950" />
-          <span>Generar Sermón 10.0 con IA</span>
+          <span>Generar Nuevo Sermón con IA</span>
         </button>
       </div>
 
       {/* Main Grid: Library on Left, Selected Sermon on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Search & Sermon Catalog (5 cols) */}
+        {/* Left Column: Search & Sermon Catalog (4 cols) */}
         <div className="lg:col-span-4 space-y-3">
           <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-800 space-y-2">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Buscar por pasaje, título o etiqueta..."
+                placeholder="Buscar por pasaje, tema, tipo o etiqueta..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
@@ -250,13 +251,16 @@ ${selectedSermon.callToAction}`;
             </div>
           </div>
 
-          <div className="space-y-2 max-h-[640px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[660px] overflow-y-auto pr-1">
             {filteredSermons.map((sermon) => {
               const isSelected = selectedSermon?.id === sermon.id;
               return (
                 <div
                   key={sermon.id}
-                  onClick={() => setSelectedSermon(sermon)}
+                  onClick={() => {
+                    setSelectedSermon(sermon);
+                    setCurrentSlideIndex(0);
+                  }}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${
                     isSelected
                       ? 'bg-gradient-to-r from-amber-500/15 via-slate-900 to-slate-900 border-amber-500/50 shadow-md'
@@ -264,8 +268,10 @@ ${selectedSermon.callToAction}`;
                   }`}
                 >
                   <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                    <span className="font-semibold text-amber-400">{sermon.series || 'Mensaje Temático'}</span>
-                    <span>{sermon.dateCreated}</span>
+                    <span className="font-semibold text-amber-400 uppercase tracking-wider">
+                      {sermon.sermonType || sermon.series || 'Expositivo'}
+                    </span>
+                    <span className="font-mono text-slate-500">{sermon.dateCreated}</span>
                   </div>
 
                   <h3 className="font-bold text-xs text-white mb-1 line-clamp-1">
@@ -292,19 +298,43 @@ ${selectedSermon.callToAction}`;
         {/* Right Column: Full Sermon 10.0 Multi-View (8 cols) */}
         <div className="lg:col-span-8">
           {selectedSermon ? (
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-5">
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-xl">
               {/* Top Sermon Header */}
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-slate-800">
                 <div>
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-                    {selectedSermon.series}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      Género: {(selectedSermon.sermonType || 'Expositivo').toUpperCase()}
+                    </span>
+                    {selectedSermon.generationSource && (
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                        selectedSermon.generationSource === 'gemini-live'
+                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                          : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                      }`}>
+                        {selectedSermon.generationSource === 'gemini-live' ? '✓ Generado con IA en Vivo' : '✓ Motor Hermenéutico Local'}
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-xl font-extrabold text-white mt-1">
                     {selectedSermon.title}
                   </h2>
-                  <p className="text-xs font-mono text-cyan-300 mt-1">
-                    {selectedSermon.mainPassage}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-1">
+                    <span className="font-mono text-cyan-300 font-semibold">{selectedSermon.mainPassage}</span>
+                    <span>&bull;</span>
+                    <span>Versión: {selectedSermon.bibleTranslation || 'RVR1960'}</span>
+                    <span>&bull;</span>
+                    <span>Audiencia: {selectedSermon.targetAudience}</span>
+                    {selectedSermon.estimatedDurationMinutes && (
+                      <>
+                        <span>&bull;</span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-amber-400" />
+                          <span>{selectedSermon.estimatedDurationMinutes} min</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -352,33 +382,43 @@ ${selectedSermon.callToAction}`;
                 })}
               </div>
 
-              {/* TAB 1: BOSQUEJO HOMILÉTICO */}
+              {/* TAB 1: BOSQUEJO HOMILÉTICO (DINÁMICO SEGÚN EL SERMÓN) */}
               {activeTab === 'bosquejo' && (
                 <div className="space-y-5 animate-fadeIn">
                   {/* Homiletical Proposition */}
                   <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
                     <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider block mb-1">
-                      Idea Homilética Central (Proposición)
+                      Idea Homilética Central (Proposición Teológica)
                     </span>
                     <p className="text-xs sm:text-sm font-semibold text-amber-100 font-serif leading-relaxed">
                       "{selectedSermon.homileticalIdea}"
                     </p>
                   </div>
 
+                  {/* Objective & Spiritual Purpose */}
+                  {selectedSermon.objective && (
+                    <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                        Objetivo Formativo y Pastoral:
+                      </span>
+                      <p className="text-slate-300">{selectedSermon.objective}</p>
+                    </div>
+                  )}
+
                   {/* Introduction */}
                   <div>
                     <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
                       Introducción & Conexión Cultural
                     </h3>
-                    <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                    <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-xl border border-slate-800">
                       {selectedSermon.introduction}
                     </p>
                   </div>
 
-                  {/* 3 Main Points */}
+                  {/* Main Points - 100% Dynamic from selectedSermon.points */}
                   <div className="space-y-4">
                     <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                      Desarrollo Homilético (3 Puntos Exegéticos)
+                      Desarrollo Homilético ({selectedSermon.points.length} Puntos Específicos)
                     </h3>
 
                     {selectedSermon.points.map((pt, idx) => (
@@ -390,20 +430,47 @@ ${selectedSermon.callToAction}`;
                           <span>{pt.title}</span>
                         </p>
 
-                        <div className="space-y-1.5 pl-7">
-                          <p className="text-slate-300">
-                            <strong className="text-cyan-400">Exégesis Bíblica:</strong> {pt.scriptureExplanation}
-                          </p>
-                          <p className="text-slate-400 italic">
-                            <strong className="text-amber-400 not-italic">Ilustración:</strong> "{pt.contemporaryIllustration}"
-                          </p>
-                          <p className="text-emerald-300 font-medium">
-                            <strong className="text-emerald-400">Aplicación del Lunes:</strong> {pt.practicalApplication}
-                          </p>
+                        <div className="space-y-2 pl-7">
+                          <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                            <span className="text-[10px] uppercase font-bold text-cyan-400 block mb-0.5">
+                              Exégesis Bíblica del Pasaje:
+                            </span>
+                            <p className="text-slate-300 leading-relaxed">{pt.scriptureExplanation}</p>
+                          </div>
+
+                          <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                            <span className="text-[10px] uppercase font-bold text-amber-400 block mb-0.5">
+                              Ilustración Contemporánea:
+                            </span>
+                            <p className="text-slate-300 italic leading-relaxed">"{pt.contemporaryIllustration}"</p>
+                          </div>
+
+                          <div className="p-2.5 bg-emerald-950/20 rounded-lg border border-emerald-500/20">
+                            <span className="text-[10px] uppercase font-bold text-emerald-400 block mb-0.5">
+                              Aplicación del Lunes por la Mañana:
+                            </span>
+                            <p className="text-emerald-200/90 font-medium leading-relaxed">{pt.practicalApplication}</p>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
+
+                  {/* Supporting Passages */}
+                  {selectedSermon.supportingPassages && selectedSermon.supportingPassages.length > 0 && (
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                        Referencias Bíblicas Complementarias:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedSermon.supportingPassages.map((p, i) => (
+                          <span key={i} className="px-2.5 py-1 bg-slate-900 text-cyan-300 border border-slate-800 rounded-md font-mono text-[11px]">
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Conclusion & Altarcall */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -412,80 +479,105 @@ ${selectedSermon.callToAction}`;
                       <p className="text-slate-400 leading-relaxed">{selectedSermon.conclusion}</p>
                     </div>
                     <div className="p-3.5 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                      <h4 className="font-bold text-amber-400 mb-1">Llamado al Altar</h4>
+                      <h4 className="font-bold text-amber-400 mb-1">Llamado al Altar & Ministración</h4>
                       <p className="text-amber-200/90 leading-relaxed font-serif">{selectedSermon.callToAction}</p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* TAB 2: EXÉGESIS & CONTEXTO HISTÓRICO */}
+              {/* TAB 2: EXÉGESIS & CONTEXTO HISTÓRICO (DINÁMICO DEL PASAJE) */}
               {activeTab === 'exegesis' && (
                 <div className="space-y-4 text-xs animate-fadeIn">
                   <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
-                    <h4 className="font-bold text-amber-400 text-sm">Contexto Histórico y Cultural del Pasaje</h4>
+                    <h4 className="font-bold text-amber-400 text-sm">
+                      Contexto Histórico y Literario de {selectedSermon.mainPassage}
+                    </h4>
                     <p className="text-slate-300 leading-relaxed">
-                      El trasfondo pastoril del antiguo Cercano Oriente revela que el pastor no era un simple cuidador comercial, sino un protector armado cuya propia vida dependía de la seguridad de las ovejas. David redacta el Salmo 23 no desde la ingenuidad palaciega, sino habiendo enfrentado leones y osos en el desierto de Judea.
+                      {selectedSermon.historicalContext || `Análisis contextualizado del pasaje ${selectedSermon.mainPassage} para ${selectedSermon.title}.`}
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
-                      <h5 className="font-bold text-cyan-300">Términos Clave en Hebreo / Griego:</h5>
-                      <ul className="space-y-2 text-slate-300">
-                        <li><strong className="text-white font-mono">יהוה רעי (Yahweh-Rohi):</strong> "El Señor es mi Pastor íntimo y presente".</li>
-                        <li><strong className="text-white font-mono">רדף (Radaph):</strong> "Perseguir con tenacidad indomable" (v. 6).</li>
-                        <li><strong className="text-white font-mono">ψυχή (Psyché):</strong> "El Buen Pastor su vida (alma) pone por las ovejas" (Juan 10:11).</li>
-                      </ul>
-                    </div>
+                  {/* Original Languages Exegesis */}
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-cyan-300 text-xs uppercase tracking-wider">
+                      Vocabulario y Raíces Exegéticas en Idiomas Originales:
+                    </h4>
 
-                    <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
-                      <h5 className="font-bold text-emerald-300">Teología Bíblica Cristocéntrica:</h5>
-                      <p className="text-slate-300 leading-relaxed">
-                        El Salmo 23 encuentra su cumplimiento pleno en el Evangelio de Juan. Jesús declara en el templo: "Yo soy el Buen Pastor". El cayado que nos protege es la cruz, donde Cristo absorbió la condenación del abismo para que nosotros caminemos seguros.
-                      </p>
-                    </div>
+                    {selectedSermon.exegesisOriginalLanguages && selectedSermon.exegesisOriginalLanguages.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {selectedSermon.exegesisOriginalLanguages.map((w, idx) => (
+                          <div key={idx} className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-base font-bold text-white font-serif">{w.word}</span>
+                              <span className="text-[10px] uppercase font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+                                {w.language} ({w.transliteration || ''})
+                              </span>
+                            </div>
+                            <p className="text-slate-300 text-[11px]"><strong className="text-slate-400">Definición:</strong> {w.definition}</p>
+                            <p className="text-cyan-300 text-[11px]"><strong className="text-cyan-400">Impacto en el Púlpito:</strong> {w.homileticImpact}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-slate-400 text-xs">
+                        Este sermón aborda el texto de {selectedSermon.mainPassage} mediante análisis de términos clave y teología bíblica aplicada a {selectedSermon.title}.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* TAB 3: GRUPOS PEQUEÑOS / CÉLULAS */}
+              {/* TAB 3: GRUPOS PEQUEÑOS / CÉLULAS (DINÁMICO DEL SERMÓN) */}
               {activeTab === 'celulas' && (
                 <div className="space-y-4 text-xs animate-fadeIn">
                   <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
-                    <h4 className="font-bold text-amber-400 text-sm">Guía de Diálogo para Grupos Pequeños</h4>
+                    <h4 className="font-bold text-amber-400 text-sm">
+                      Guía de Diálogo para Grupos Pequeños: {selectedSermon.title}
+                    </h4>
                     <p className="text-slate-400">
-                      Preguntas diseñadas para derribar máscaras y generar comunión genuina en las células de la semana.
+                      Preguntas diseñadas para conectar la enseñanza de {selectedSermon.mainPassage} con la vida diaria en comunidad.
                     </p>
+
                     <ol className="space-y-3 list-decimal list-inside text-slate-200">
-                      <li className="p-2.5 bg-slate-900 rounded-lg">
-                        <strong>Rompehielos:</strong> ¿Cuál ha sido una situación reciente donde sentiste que no tenías el control absoluto de las cosas?
-                      </li>
-                      <li className="p-2.5 bg-slate-900 rounded-lg">
-                        <strong>Profundización:</strong> ¿Por qué nos cuesta tanto creer de corazón que 'nada nos faltará' cuando vemos noticias o cuentas por pagar?
-                      </li>
-                      <li className="p-2.5 bg-slate-900 rounded-lg">
-                        <strong>Aplicación:</strong> ¿Qué 'angustiador' necesitas poner en las manos de Dios esta semana para cenar en su paz?
-                      </li>
+                      {(selectedSermon.smallGroupQuestions && selectedSermon.smallGroupQuestions.length > 0
+                        ? selectedSermon.smallGroupQuestions
+                        : [
+                            `¿De qué manera el pasaje de ${selectedSermon.mainPassage} desafía tus pensamientos cotidianos sobre ${selectedSermon.title}?`,
+                            `En tu experiencia personal, ¿cuál ha sido el obstáculo más grande para aplicar este principio en tu familia o trabajo?`,
+                            `¿Qué acción concreta te comprometes a realizar esta semana como respuesta a lo que Dios te habló a través de este mensaje?`
+                          ]
+                      ).map((q, idx) => (
+                        <li key={idx} className="p-3 bg-slate-900 rounded-lg leading-relaxed">
+                          {q}
+                        </li>
+                      ))}
                     </ol>
                   </div>
                 </div>
               )}
 
-              {/* TAB 4: PLAN DEVOCIONAL 3 DÍAS */}
+              {/* TAB 4: PLAN DEVOCIONAL 3 DÍAS (DINÁMICO DEL SERMÓN) */}
               {activeTab === 'devocional' && (
                 <div className="space-y-3 text-xs animate-fadeIn">
-                  {[
-                    { dia: 'Día 1', titulo: 'Renunciando a la Ansiedad del Control', pasaje: 'Salmos 23:1-3', reflexion: 'Comienza el día meditando en que Dios no necesita tu estrés para resolver tus problemas.' },
-                    { dia: 'Día 2', titulo: 'Paz en Medio de la Tormenta', pasaje: 'Salmos 23:4-5', reflexion: 'El valle de sombra de muerte no es un destino final, es sólo un pasaje hacia pastos delicados.' },
-                    { dia: 'Día 3', titulo: 'La Misericordia que no se Rinde', pasaje: 'Salmos 23:6', reflexion: 'Su gracia te acompaña hoy. Descansa en la fidelidad eterna de Cristo.' },
-                  ].map((dev, idx) => (
+                  {(selectedSermon.devotionalPlan && selectedSermon.devotionalPlan.length > 0
+                    ? selectedSermon.devotionalPlan
+                    : [
+                        { day: 1, title: `Profundizando en ${selectedSermon.mainPassage}`, passage: selectedSermon.mainPassage, meditation: `Medita en la proposición: "${selectedSermon.homileticalIdea}".`, prayerPrompt: `Señor, abre mi entendimiento para caminar en la verdad de este pasaje.` },
+                        { day: 2, title: 'Renovación y Entrega', passage: selectedSermon.supportingPassages[0] || selectedSermon.mainPassage, meditation: 'Examina qué actitudes de tu corazón necesitan alinearse con la voluntad divina.', prayerPrompt: 'Padre, transforma mis motivaciones y lléname de tu paz.' },
+                        { day: 3, title: 'Fruto en Acción', passage: selectedSermon.supportingPassages[1] || selectedSermon.mainPassage, meditation: 'Permite que la palabra escuchada se traduzca en amor y servicio al prójimo.', prayerPrompt: 'Usa mi testimonio hoy para edificar a quienes me rodean.' },
+                      ]
+                  ).map((dev, idx) => (
                     <div key={idx} className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
                       <div className="flex items-center justify-between text-amber-400 font-bold">
-                        <span>{dev.dia}: {dev.titulo}</span>
-                        <span className="font-mono text-cyan-300 text-[11px]">{dev.pasaje}</span>
+                        <span>Día {dev.day}: {dev.title}</span>
+                        <span className="font-mono text-cyan-300 text-[11px]">{dev.passage}</span>
                       </div>
-                      <p className="text-slate-300">{dev.reflexion}</p>
+                      <p className="text-slate-300 leading-relaxed">{dev.meditation}</p>
+                      <div className="pt-1 text-[11px] text-purple-300 flex items-center gap-1">
+                        <Heart className="w-3.5 h-3.5 text-purple-400" />
+                        <span><strong>Oración:</strong> {dev.prayerPrompt}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -618,95 +710,215 @@ ${selectedSermon.callToAction}`;
         </div>
       )}
 
-      {/* Modal: AI Sermon Generator */}
+      {/* Modal: AI Sermon Generator (Formulario Homilético Completo) */}
       {isGeneratorOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 my-8">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-4 my-8">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-400" />
-                <span>Generador Homilético 10.0 con IA</span>
-              </h2>
-              <button onClick={() => setIsGeneratorOpen(false)} className="text-slate-400 hover:text-white">
-                ✕
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">Generador Homilético 10.0 con IA</h2>
+                  <p className="text-[11px] text-slate-400">Contenido exegético 100% individualizado para cada pasaje y tema</p>
+                </div>
+              </div>
+              <button onClick={() => setIsGeneratorOpen(false)} className="text-slate-400 hover:text-white p-1">
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleGenerateAiSermon} className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Pasaje Bíblico Principal *</label>
-                <input
-                  type="text"
-                  required
-                  value={mainPassage}
-                  onChange={(e) => setMainPassage(e.target.value)}
-                  placeholder="Ej. Romanos 8:1-4, Salmo 34:18"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
-                />
+            {/* Quick Test Scenarios Buttons */}
+            <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 space-y-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                Casos de Prueba Rápida (Auditoría Homilética):
+              </span>
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTheme('La gracia de Dios');
+                    setMainPassage('Efesios 2:1-10');
+                    setSermonType('expositivo');
+                    setTargetAudience('Congregación General');
+                    setObjective('Comprender la suficiencia de la gracia inmerecida y desarmar el legalismo.');
+                    setTheologicalFocus('Soberanía de la gracia y regeneración por el Espíritu');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium transition"
+                >
+                  ⚡ Prueba A: Gracia (Ef. 2:1-10)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTheme('La perseverancia en la prueba');
+                    setMainPassage('Santiago 1:2-8');
+                    setSermonType('expositivo');
+                    setTargetAudience('Creyentes en sufrimiento');
+                    setObjective('Hallar gozo y sabiduría divina en medio de las tribulaciones.');
+                    setTheologicalFocus('Madurez de carácter forjada por la fe perseverante');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-medium transition"
+                >
+                  ⚡ Prueba B: Pruebas (Stgo. 1:2-8)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTheme('El perdón en la familia');
+                    setMainPassage('Colosenses 3:12-15');
+                    setSermonType('pastoral');
+                    setTargetAudience('Familias y matrimonios');
+                    setObjective('Derribar murallas de resentimiento y perdonar como Cristo perdonó.');
+                    setTheologicalFocus('Amor sacrificial y el perdón como cancelación de deudas');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium transition"
+                >
+                  ⚡ Prueba C: Familia (Col. 3:12-15)
+                </button>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Tema / Propósito del Mensaje *</label>
-                <input
-                  type="text"
-                  required
-                  value={theme}
-                  onChange={(e) => setTheme(e.target.value)}
-                  placeholder="Ej. La gracia que desarma la culpa y la condenación"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleGenerateAiSermon} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Serie de Predicación</label>
+                  <label className="block text-slate-300 font-bold mb-1">Tema / Asunto Central *</label>
                   <input
                     type="text"
-                    value={seriesName}
-                    onChange={(e) => setSeriesName(e.target.value)}
-                    placeholder="Ej. Caminando en Victoria"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                    required
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value)}
+                    placeholder="Ej. La gracia soberana de Dios ante la culpa"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Audiencia Objetivo</label>
+                  <label className="block text-slate-300 font-bold mb-1">Pasaje Bíblico Principal *</label>
+                  <input
+                    type="text"
+                    required
+                    value={mainPassage}
+                    onChange={(e) => setMainPassage(e.target.value)}
+                    placeholder="Ej. Efesios 2:1-10, Santiago 1:2-8, Colosenses 3:12-15"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Tipo de Sermón</label>
+                  <select
+                    value={sermonType}
+                    onChange={(e) => setSermonType(e.target.value as SermonType)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="expositivo">Expositivo (Verso a verso)</option>
+                    <option value="textual">Textual (Estructura del texto)</option>
+                    <option value="tematico">Temático (Síntesis bíblica)</option>
+                    <option value="pastoral">Pastoral (Cuidado y sanidad)</option>
+                    <option value="evangelistico">Evangelístico (Salvación en Cristo)</option>
+                    <option value="doctrinal">Doctrinal (Fundamento teológico)</option>
+                    <option value="devocional">Devocional (Inspiracional)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Audiencia Objetivo</label>
                   <input
                     type="text"
                     value={targetAudience}
                     onChange={(e) => setTargetAudience(e.target.value)}
-                    placeholder="Ej. Jóvenes, matrimonios"
+                    placeholder="Ej. Jóvenes, familias, congregación"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Versión Bíblica</label>
+                  <select
+                    value={bibleTranslation}
+                    onChange={(e) => setBibleTranslation(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                  >
+                    <option value="RVR1960">Reina Valera 1960</option>
+                    <option value="NVI">Nueva Versión Internacional</option>
+                    <option value="NTV">Nueva Traducción Viviente</option>
+                    <option value="LBLA">La Biblia de las Américas</option>
+                    <option value="DHH">Dios Habla Hoy</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
-                <p className="font-semibold text-amber-400 mb-1">Motor Homilético 10.0:</p>
-                Generará exégesis profunda, raíces griegas/hebreas, 3 ilustraciones de impacto, preguntas para células, plan devocional y diapositivas de proyección.
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Propósito / Objetivo Formativo y Espiritual</label>
+                <input
+                  type="text"
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  placeholder="Ej. Llevar a la congregación a descansar en la gracia y perdonar a quienes los ofendieron"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                />
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Enfoque Teológico / Pastoral</label>
+                  <input
+                    type="text"
+                    value={theologicalFocus}
+                    onChange={(e) => setTheologicalFocus(e.target.value)}
+                    placeholder="Ej. Cristocéntrico, consolador, desafiante"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">Duración Estimada (Minutos)</label>
+                  <select
+                    value={estimatedDurationMinutes}
+                    onChange={(e) => setEstimatedDurationMinutes(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                  >
+                    <option value={25}>25 Minutos (Breve / Devocional)</option>
+                    <option value={35}>35 Minutos (Estándar Dominical)</option>
+                    <option value={45}>45 Minutos (Profundo / Exegético)</option>
+                    <option value={60}>60 Minutos (Seminario / Escuela)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5 text-[11px] text-amber-200">
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Garantía Anti-Plantillas:</strong> El motor construirá puntos, exégesis, raíces griegas/hebreas e ilustraciones diseñadas exclusivamente para <strong>{mainPassage || 'el pasaje indicado'}</strong>.
+                </span>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsGeneratorOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold"
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-semibold hover:bg-slate-700"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Elaborando Homilética 10.0...</span>
+                      <span>Elaborando Sermón Exegético...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 fill-slate-950" />
-                      <span>Crear Sermón 10.0 Completo</span>
+                      <span>Generar Sermón con IA</span>
                     </>
                   )}
                 </button>

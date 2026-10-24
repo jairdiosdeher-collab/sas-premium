@@ -167,6 +167,31 @@ export interface Appointment {
   reminderSent: boolean;
 }
 
+export type SermonType = 
+  | 'expositivo' 
+  | 'textual' 
+  | 'tematico' 
+  | 'evangelistico' 
+  | 'doctrinal' 
+  | 'pastoral' 
+  | 'devocional';
+
+export interface SermonOriginalWord {
+  word: string;
+  transliteration?: string;
+  language: 'hebreo' | 'griego' | 'arameo';
+  definition: string;
+  homileticImpact: string;
+}
+
+export interface SermonDevotionalDay {
+  day: number;
+  title: string;
+  passage: string;
+  meditation: string;
+  prayerPrompt: string;
+}
+
 export interface Sermon {
   id: string;
   title: string;
@@ -176,6 +201,12 @@ export interface Sermon {
   homileticalIdea: string;
   objective: string;
   introduction: string;
+  sermonType?: SermonType;
+  theologicalFocus?: string;
+  bibleTranslation?: string;
+  estimatedDurationMinutes?: number;
+  historicalContext?: string;
+  exegesisOriginalLanguages?: SermonOriginalWord[];
   points: {
     title: string;
     scriptureExplanation: string;
@@ -184,9 +215,12 @@ export interface Sermon {
   }[];
   conclusion: string;
   callToAction: string;
+  smallGroupQuestions?: string[];
+  devotionalPlan?: SermonDevotionalDay[];
   tags: string[];
   dateCreated: string;
   targetAudience: string;
+  generationSource?: 'gemini-live' | 'local-engine';
 }
 
 export interface SmallGroupResource {

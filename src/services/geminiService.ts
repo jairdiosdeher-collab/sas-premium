@@ -9,6 +9,16 @@ export interface AiGenerationResult {
   source: 'gemini-live' | 'local-engine';
 }
 
+export class GeminiService {
+  public static async callGeminiWithFallback(
+    prompt: string,
+    systemInstruction?: string
+  ): Promise<string> {
+    const result = await callGeminiApi(prompt, systemInstruction);
+    return result.text;
+  }
+}
+
 export async function callGeminiApi(
   prompt: string,
   systemInstruction?: string
