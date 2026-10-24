@@ -223,21 +223,35 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
 
   const handlePrintReport = async () => {
     try {
-      // Esperar a que la ilustración generada termine de cargar antes de abrir el diálogo de impresión.
-      const printImages = Array.from(document.querySelectorAll<HTMLImageElement>('.heraldry-generated-image'));
-      await Promise.all(printImages.map((img) => {
-        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-        return new Promise<void>((resolve) => {
-          const finish = () => resolve();
-          img.addEventListener('load', finish, { once: true });
-          img.addEventListener('error', finish, { once: true });
-          window.setTimeout(finish, 5000);
-        });
+      // Esperar explícitamente a que el SVG autocontenido de la portada esté decodificado.
+      const printImages = Array.from(document.querySelectorAll<HTMLImageElement>('.print-shield-image, .heraldry-generated-image'));
+      await Promise.all(printImages.map(async (img) => {
+        try {
+          if (typeof img.decode === 'function') {
+            await Promise.race([
+              img.decode(),
+              new Promise<void>((resolve) => window.setTimeout(resolve, 8000)),
+            ]);
+          } else if (!img.complete || img.naturalWidth === 0) {
+            await new Promise<void>((resolve) => {
+              const finish = () => resolve();
+              img.addEventListener('load', finish, { once: true });
+              img.addEventListener('error', finish, { once: true });
+              window.setTimeout(finish, 8000);
+            });
+          }
+          if (img.classList.contains('print-shield-image') && img.naturalWidth === 0) {
+            console.warn('El SVG del escudo no se decodificó; revisar el origen del SVG antes de imprimir.');
+          }
+        } catch (imageError) {
+          console.warn('No se pudo decodificar una imagen antes de imprimir:', imageError);
+        }
       }));
     } catch (error) {
-      console.warn('No fue posible esperar todas las imágenes antes de imprimir:', error);
+      console.warn('No fue posible preparar todas las imágenes antes de imprimir:', error);
     }
-    window.print();
+    // Permitir al navegador aplicar estilos de impresión antes de abrir el diálogo.
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.print()));
   };
 
   const handleGenerateShieldImage = async () => {
