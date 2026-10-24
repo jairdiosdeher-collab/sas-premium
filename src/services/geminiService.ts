@@ -8,6 +8,7 @@ export interface AiGenerationResult {
   text: string;
   source: 'gemini-live' | 'local-engine';
   modelUsed?: string;
+  groundingSources?: Array<{ title: string; url: string }>;
   error?: {
     code: string;
     message: string;
@@ -67,7 +68,8 @@ export class GeminiService {
 export async function callGeminiApi(
   prompt: string,
   systemInstruction?: string,
-  responseMimeType?: string
+  responseMimeType?: string,
+  enableWebSearch = false
 ): Promise<AiGenerationResult> {
   let capturedError: AiGenerationResult['error'] = undefined;
 
@@ -77,7 +79,7 @@ export async function callGeminiApi(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, systemInstruction, responseMimeType }),
+      body: JSON.stringify({ prompt, systemInstruction, responseMimeType, enableWebSearch }),
     });
 
     if (res.ok) {
@@ -87,6 +89,7 @@ export async function callGeminiApi(
           text: data.text,
           source: 'gemini-live',
           modelUsed: data.modelUsed || 'gemini-3.8-flash',
+          groundingSources: Array.isArray(data.groundingSources) ? data.groundingSources : [],
         };
       }
       if (data.error) {
