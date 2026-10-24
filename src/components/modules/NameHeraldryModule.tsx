@@ -218,7 +218,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
   const handlePrintReport = async () => {
     try {
       // Esperar a que la ilustración generada termine de cargar antes de abrir el diálogo de impresión.
-      const printImages = Array.from(document.querySelectorAll<HTMLImageElement>('.heraldry-print-report img'));
+      const printImages = Array.from(document.querySelectorAll<HTMLImageElement>('.heraldry-generated-image'));
       await Promise.all(printImages.map((img) => {
         if (img.complete && img.naturalWidth > 0) return Promise.resolve();
         return new Promise<void>((resolve) => {
@@ -692,7 +692,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
           <div className="relative rounded-2xl bg-[#f8f4ea] p-3 sm:p-5 shadow-inner border border-amber-900/20 flex flex-col items-center justify-center overflow-visible">
             <div className="w-full max-w-[280px] sm:max-w-[340px] md:max-w-[380px] shield-svg-wrapper drop-shadow-md transition-all duration-300">
               {generatedShieldImage ? (
-                <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${previewFullName || 'tu nombre'}`} className="w-full h-full object-contain" />
+                <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${previewFullName || 'tu nombre'}`} className="heraldry-generated-image w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center" dangerouslySetInnerHTML={{ __html: currentShieldSvg }} />
               )}
@@ -1150,7 +1150,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                     <div className="md:col-span-5 flex flex-col items-center justify-center p-4 sm:p-6 bg-[#f8f4ea] rounded-2xl border border-amber-900/20 shadow-inner overflow-visible">
                       <div className="w-full max-w-[280px] sm:max-w-[340px] md:max-w-[380px] shield-svg-wrapper drop-shadow-md">
                         {generatedShieldImage ? (
-                          <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${previewFullName || 'tu nombre'}`} className="w-full h-full object-contain" />
+                          <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${previewFullName || 'tu nombre'}`} className="heraldry-generated-image w-full h-full object-contain" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center" dangerouslySetInnerHTML={{ __html: currentShieldSvg }} />
                         )}
@@ -1286,7 +1286,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                       </div>
                       <div className="w-24 sm:w-28 shrink-0 bg-[#f8f4ea] p-1.5 rounded-lg border border-amber-900/20 shadow-sm shield-svg-wrapper">
                         {generatedShieldImage ? (
-                          <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${previewFullName || 'tu nombre'}`} className="w-full h-full object-contain" />
+                          <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${previewFullName || 'tu nombre'}`} className="heraldry-generated-image w-full h-full object-contain" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center" dangerouslySetInnerHTML={{ __html: currentShieldSvg }} />
                         )}
@@ -1356,7 +1356,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
             {/* EMBLEMA CENTRAL COMPLETO, NÍTIDO Y EXACTAMENTE CENTRADO */}
             <div className="my-4 w-full max-w-[130mm] aspect-[900/1150] shield-svg-wrapper flex items-center justify-center border border-amber-900/20 rounded-2xl bg-[#f8f4ea] p-3 shadow-none">
               {generatedShieldImage ? (
-                <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${report.sectionA_Name.submittedFullName}`} className="w-full h-full object-contain" />
+                <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${report.sectionA_Name.submittedFullName}`} className="heraldry-generated-image w-full h-full object-contain" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:object-contain" dangerouslySetInnerHTML={{ __html: currentShieldSvg }} />
               )}
