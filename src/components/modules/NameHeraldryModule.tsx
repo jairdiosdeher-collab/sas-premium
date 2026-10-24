@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { BookOpen, Download, Feather, Shield, Sparkles, Loader2, AlertTriangle, Copy, Check } from 'lucide-react';
 import { callGeminiApi } from '../../services/geminiService';
 
@@ -47,6 +48,7 @@ export const NameHeraldryModule: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const palette = useMemo(() => palettes[((name + surname).length) % palettes.length], [name, surname]);
   const fullName = [name.trim(), surname.trim()].filter(Boolean).join(' ');
   const shieldSvg = useMemo(() => buildShieldSvg(name.trim(), surname.trim(), palette), [name, surname, palette]);
@@ -94,6 +96,109 @@ Reglas obligatorias:
     a.download = `informe-nombre-${(fullName || 'personal').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+
+  const downloadPdf = async () => {
+    if (!report.trim()) {
+      setError('Primero genera el informe para poder descargar el PDF completo.');
+      return;
+    }
+    setPdfLoading(true);
+    setError('');
+    let imageUrl: string | undefined;
+    try {
+      // Convertir el SVG actual a PNG para que el emblema quede incrustado en el PDF.
+      const svgBlob = new Blob([shieldSvg], { type: 'image/svg+xml;charset=utf-8' });
+      imageUrl = URL.createObjectURL(svgBlob);
+      const emblemImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('No se pudo preparar el emblema para el PDF.'));
+        image.src = imageUrl!;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = 900;
+      canvas.height = 1080;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('El navegador no permite preparar la imagen del emblema.');
+      context.fillStyle = '#f8f4ea';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(emblemImage, 0, 0, canvas.width, canvas.height);
+      const emblemPng = canvas.toDataURL('image/png');
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 18;
+      const textWidth = pageWidth - margin * 2;
+      const safeText = (value: string) => value
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/[—–]/g, '-')
+        .replace(/•/g, '-')
+        .replace(/…/g, '...')
+        .replace(/[^\\u0000-\\u00FF]/g, '');
+      const printableName = safeText(fullName || 'Nombre personal');
+      pdf.setTextColor(24, 38, 59);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(19);
+      pdf.text('MI NOMBRE ANTE LA PALABRA', pageWidth / 2, 20, { align: 'center', maxWidth: textWidth });
+      pdf.setFontSize(14);
+      pdf.text(printableName, pageWidth / 2, 29, { align: 'center', maxWidth: textWidth });
+      pdf.addImage(emblemPng, 'PNG', (pageWidth - 76) / 2, 35, 76, 91, undefined, 'FAST');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.text('NOTA SOBRE EL EMBLEMA', margin, 136);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      const disclaimer = 'Este emblema es un diseño simbólico ilustrativo. No certifica armas históricas, linaje ni parentesco genealógico.';
+      const disclaimerLines = pdf.splitTextToSize(safeText(disclaimer), textWidth);
+      pdf.text(disclaimerLines, margin, 142);
+      pdf.setDrawColor(215, 181, 109);
+      pdf.line(margin, 153, pageWidth - margin, 153);
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(13);
+      pdf.text('INFORME DEVOCIONAL Y DE INVESTIGACIÓN', margin, 163);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      const bodyLines = pdf.splitTextToSize(safeText(report), textWidth);
+      let y = 171;
+      const lineHeight = 5.1;
+      for (const line of bodyLines) {
+        if (y > pageHeight - 18) {
+          pdf.addPage();
+          y = 20;
+        }
+        pdf.text(String(line), margin, y);
+        y += lineHeight;
+      }
+      if (y > pageHeight - 30) {
+        pdf.addPage();
+        y = 20;
+      } else {
+        y += 7;
+      }
+      pdf.setFontSize(8);
+      pdf.setTextColor(90, 100, 112);
+      const footer = 'Material educativo, devocional y de autoconocimiento. No constituye diagnóstico psicológico ni certificación genealógica o heráldica.';
+      const footerLines = pdf.splitTextToSize(safeText(footer), textWidth);
+      if (y + footerLines.length * 4 > pageHeight - 10) {
+        pdf.addPage();
+        y = 20;
+      }
+      pdf.text(footerLines, margin, y);
+      const fileSlug = printableName.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'personal';
+      pdf.save(`informe-mi-nombre-${fileSlug}.pdf`);
+    } catch (downloadError) {
+      console.error('Error al generar el PDF de Mi nombre ante la Palabra:', downloadError);
+      setError('No se pudo generar el PDF. Comprueba que el navegador permita las descargas e inténtalo de nuevo.');
+    } finally {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+      setPdfLoading(false);
+    }
   };
 
   const downloadShield = () => {
@@ -192,6 +297,7 @@ Reglas obligatorias:
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={copyReport} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800">{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? 'Copiado' : 'Copiar'}</button>
             <button type="button" onClick={downloadText} className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-3 py-2 text-xs font-extrabold text-slate-950 hover:bg-amber-300"><Download className="h-4 w-4" /> Descargar informe TXT</button>
+            <button type="button" onClick={downloadPdf} disabled={pdfLoading || !report.trim()} className="inline-flex items-center gap-2 rounded-lg border border-amber-400/40 px-3 py-2 text-xs font-extrabold text-amber-200 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-50"><Download className="h-4 w-4" /> {pdfLoading ? "Preparando PDF..." : "Descargar informe completo en PDF"}</button>
           </div>
         </div>
         <article className="whitespace-pre-wrap text-sm leading-7 text-slate-200">{report}</article>
