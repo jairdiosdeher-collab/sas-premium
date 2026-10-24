@@ -292,16 +292,7 @@ Reglas obligatorias de investigación:
           </div>
           <div className="mx-auto max-w-xs rounded-2xl bg-[#f8f4ea] p-3 shadow-xl">
             <div className="text-center text-[9px] font-bold tracking-[.18em] text-slate-700">MEMORIA · IDENTIDAD · HISTORIA</div>
-            <svg viewBox="0 0 300 350" className="mx-auto w-full" role="img" aria-label="Emblema simbólico personalizado">
-              <path d="M150 20 L250 55 L238 180 Q220 240 150 285 Q80 240 62 180 L50 55 Z" fill={palette.field} stroke={palette.accent} strokeWidth="5" />
-              <path d="M150 32 L238 62 L228 178 Q211 231 150 270 Q89 231 72 178 L62 62 Z" fill="none" stroke={palette.secondary} strokeWidth="1.5" />
-              <path d="M150 78 L150 235 M82 155 L218 155" stroke={palette.accent} strokeWidth="1.5" opacity=".8" />
-              <circle cx="150" cy="155" r="42" fill={palette.secondary} stroke={palette.accent} strokeWidth="3" />
-              <text x="150" y="166" textAnchor="middle" fontSize="28" fontWeight="bold" fill={palette.field} fontFamily="Georgia,serif">{(name.trim().charAt(0) + (surname.trim().charAt(0) || '')).toLocaleUpperCase('es') || '✦'}</text>
-              <text x="150" y="118" textAnchor="middle" fontSize="16" fill={palette.accent}>{palette.symbol}</text>
-              <text x="150" y="310" textAnchor="middle" fontSize="13" fontWeight="bold" fill="#1e293b">{(surname || name || 'TU NOMBRE').toLocaleUpperCase('es').slice(0, 24)}</text>
-              <text x="150" y="329" textAnchor="middle" fontSize="7" fill="#64748b">EMBLEMA SIMBÓLICO · NO CERTIFICA LINAJE</text>
-            </svg>
+            <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(shieldSvg)}`} alt={`Emblema simbólico personalizado de ${fullName || 'tu nombre'}`} className="mx-auto w-full" />
           </div>
           <p className="text-xs leading-5 text-slate-400">Este emblema original se crea con iniciales y elementos gráficos decorativos. No se presenta como escudo histórico de un apellido.</p>
           <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
