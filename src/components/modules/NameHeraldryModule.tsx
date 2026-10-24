@@ -76,11 +76,15 @@ Reglas obligatorias:
 - Incluye títulos: 1) Resumen del nombre; 2) Origen y grado de certeza; 3) Relación bíblica y lenguas originales cuando sea pertinente; 4) Pasaje y exégesis contextual; 5) Reflexión devocional y oración; 6) Autoconocimiento psicológico responsable (preguntas abiertas, sin diagnóstico ni inferencias desde el nombre); 7) Historia heráldica: qué puede y qué no puede afirmarse; 8) Relato simbólico del emblema adjunto, indicando explícitamente que es una creación ilustrativa si no se verifica un escudo histórico; 9) Fuentes o rutas de verificación recomendadas.
 - Escribe de forma cálida, comprensible y rigurosa. No presentes una narración simbólica como historia real.`;
     try {
-      const result = await callGeminiApi(prompt, 'Eres especialista prudente en exégesis bíblica, lingüística histórica, devocional cristiano y heráldica crítica. No inventes hechos ni presentes inferencias como certezas.');
+      const result = await callGeminiApi(prompt, 'Eres especialista prudente en exégesis bíblica, lingüística histórica, devocional cristiano y heráldica crítica. Investiga en la web cuando se solicite, cita fuentes reales devueltas por la búsqueda y no inventes hechos ni presentes inferencias como certezas.', undefined, true);
       if (result.error && result.source !== 'gemini-live') {
         setError('El servicio de IA en vivo no estuvo disponible; se muestra el resultado alternativo del sistema. Para un informe histórico fiable, vuelve a intentarlo cuando Gemini esté disponible.');
       }
-      setReport(result.text);
+      const sources = result.groundingSources || [];
+      const sourceSection = sources.length
+        ? '\n\n### Fuentes web consultadas por el sistema\n' + sources.map((source, index) => `${index + 1}. ${source.title} — ${source.url}`).join('\n')
+        : '\n\n### Estado de verificación web\nNo se recibieron fuentes web verificables en esta respuesta. La investigación heráldica debe considerarse inconclusa y no debe interpretarse como confirmación histórica.';
+      setReport(result.text + sourceSection);
     } catch {
       setError('No fue posible generar el informe. Comprueba la conexión y vuelve a intentarlo.');
     } finally {
