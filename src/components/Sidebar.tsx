@@ -21,7 +21,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Cloud
+  Cloud,
+  ScrollText
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -41,6 +42,7 @@ export type ModuleKey =
   | 'smallgroups'
   | 'pastoral'
   | 'aistudio'
+  | 'nameheraldry'
   | 'reports'
   | 'analytics'
   | 'marketing'
@@ -73,13 +75,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     administrador: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
       'assessments', 'calendar', 'tasks', 'portal', 'documents', 'library',
-      'sermons', 'smallgroups', 'pastoral', 'aistudio', 'reports', 'analytics', 
+      'sermons', 'smallgroups', 'pastoral', 'aistudio', 'nameheraldry', 'reports', 'analytics', 
       'marketing', 'affiliates', 'settings'
     ],
     psicologo: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
       'assessments', 'calendar', 'tasks', 'portal', 'documents', 'library',
-      'aistudio', 'reports', 'settings'
+      'aistudio', 'nameheraldry', 'reports', 'settings'
     ],
     pastor: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'calendar', 'tasks',
@@ -91,11 +93,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       'documents', 'library', 'reports', 'analytics', 'settings'
     ],
     invitado: [
-      'dashboard', 'sermons', 'smallgroups', 'library', 'aistudio', 'marketing'
+      'dashboard', 'sermons', 'smallgroups', 'library', 'aistudio', 'nameheraldry', 'marketing'
     ],
     consejero: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
-      'calendar', 'tasks', 'portal', 'library', 'pastoral', 'aistudio', 'reports', 'settings'
+      'calendar', 'tasks', 'portal', 'library', 'pastoral', 'aistudio', 'nameheraldry', 'reports', 'settings'
     ],
     director_ministerio: [
       'dashboard', 'crm_pipeline', 'patients', 'calendar', 'tasks', 'library',
@@ -138,6 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { key: 'smallgroups', label: 'Grupos Pequeños & Células', icon: UsersRound, category: 'pastoral' },
     { key: 'pastoral', label: 'Dirección Espiritual & Escuela', icon: Heart, category: 'pastoral', badge: 'Ficha' },
     { key: 'aistudio', label: 'Estudio de IA & Preguntas', icon: Bot, category: 'pastoral' },
+    { key: 'nameheraldry', label: 'Mi nombre ante la Palabra', icon: ScrollText, category: 'pastoral', badge: 'Nuevo' },
     { key: 'reports', label: 'Informes Profesionales PDF', icon: Printer, category: 'pastoral' },
 
     // Negocio & Crecimiento
