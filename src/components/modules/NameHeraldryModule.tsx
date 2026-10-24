@@ -109,7 +109,7 @@ Reglas obligatorias de investigación:
     a.href = url;
     a.download = `informe-nombre-${(fullName || 'personal').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')}.txt`;
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
 
@@ -120,7 +120,6 @@ Reglas obligatorias de investigación:
     }
     setPdfLoading(true);
     setError('');
-    let imageUrl: string | undefined;
     try {
       // Convertir el SVG actual a PNG para que el emblema quede incrustado en el PDF.
       // Usar un SVG codificado como data URI evita fallos de carga del Blob URL
@@ -150,13 +149,17 @@ Reglas obligatorias de investigación:
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 18;
       const textWidth = pageWidth - margin * 2;
+      // Las fuentes estándar de jsPDF no cubren todos los alfabetos Unicode.
+      // Conservamos los caracteres españoles (incluidas tildes y ñ) y normalizamos
+      // la puntuación tipográfica para mejorar la compatibilidad del PDF.
       const safeText = (value: string) => value
         .replace(/[“”]/g, '"')
         .replace(/[‘’]/g, "'")
         .replace(/[—–]/g, '-')
         .replace(/•/g, '-')
         .replace(/…/g, '...')
-        .replace(/[^\u0000-\u00FF]/g, '');
+        .replace(/\u00A0/g, ' ')
+        .replace(/[^\u0000-\u00FF]/g, '?');
       const printableName = safeText(fullName || 'Nombre personal');
       pdf.setTextColor(24, 38, 59);
       pdf.setFont('helvetica', 'bold');
@@ -184,16 +187,47 @@ Reglas obligatorias de investigación:
       pdf.text('INFORME DEVOCIONAL Y DE INVESTIGACIÓN', margin, 163);
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
-      const bodyLines = pdf.splitTextToSize(safeText(report), textWidth);
       let y = 171;
       const lineHeight = 5.1;
-      for (const line of bodyLines) {
-        if (y > pageHeight - 18) {
+      const ensureRoom = (height = lineHeight) => {
+        if (y + height > pageHeight - 17) {
           pdf.addPage();
           y = 20;
         }
-        pdf.text(String(line), margin, y);
-        y += lineHeight;
+      };
+      // Renderizar por párrafos permite conservar los saltos y destacar títulos
+      // Markdown en lugar de convertir todo el informe en un único bloque plano.
+      for (const rawParagraph of report.replace(/\r\n/g, '\n').split('\n')) {
+        const paragraph = safeText(rawParagraph.trim());
+        if (!paragraph) {
+          y += 2.5;
+          continue;
+        }
+        const heading = /^(#{1,3})\s+(.+)$/.exec(paragraph);
+        const isNumberedHeading = /^\d+[.)]\s+/.test(paragraph);
+        if (heading || isNumberedHeading) {
+          ensureRoom(9);
+          y += 1;
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(11);
+          const headingText = heading ? heading[2] : paragraph;
+          const headingLines = pdf.splitTextToSize(headingText, textWidth);
+          for (const line of headingLines) {
+            ensureRoom(6);
+            pdf.text(String(line), margin, y);
+            y += 5.5;
+          }
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+          y += 1;
+          continue;
+        }
+        const paragraphLines = pdf.splitTextToSize(paragraph, textWidth);
+        for (const line of paragraphLines) {
+          ensureRoom();
+          pdf.text(String(line), margin, y);
+          y += lineHeight;
+        }
       }
       if (y > pageHeight - 30) {
         pdf.addPage();
@@ -221,12 +255,11 @@ Reglas obligatorias de investigación:
       document.body.appendChild(downloadLink);
       downloadLink.click();
       downloadLink.remove();
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 1500);
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
     } catch (downloadError) {
       console.error('Error al generar el PDF de Mi nombre ante la Palabra:', downloadError);
       setError('No se pudo generar el PDF. Comprueba que el navegador permita las descargas e inténtalo de nuevo.');
     } finally {
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
       setPdfLoading(false);
     }
   };
@@ -237,7 +270,7 @@ Reglas obligatorias de investigación:
     a.href = url;
     a.download = `emblema-simbolico-${(fullName || 'personal').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-')}.svg`;
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
   const copyReport = async () => {
