@@ -211,7 +211,17 @@ Reglas obligatorias de investigación:
       }
       pdf.text(footerLines, margin, y);
       const fileSlug = printableName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'personal';
-      pdf.save(`informe-mi-nombre-${fileSlug}.pdf`);
+      const pdfBlob = pdf.output('blob');
+      if (!pdfBlob || pdfBlob.size < 100) throw new Error('El archivo PDF generado está vacío.');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pdfUrl;
+      downloadLink.download = `informe-mi-nombre-${fileSlug}.pdf`;
+      downloadLink.style.display = 'none';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 1500);
     } catch (downloadError) {
       console.error('Error al generar el PDF de Mi nombre ante la Palabra:', downloadError);
       setError('No se pudo generar el PDF. Comprueba que el navegador permita las descargas e inténtalo de nuevo.');
