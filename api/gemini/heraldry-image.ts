@@ -70,11 +70,17 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       modelUsed: 'gemini-2.5-flash-image',
     }));
   } catch (error: any) {
-    console.error('Error generando emblema heráldico:', error?.message || error);
-    res.statusCode = 502;
+    const details = error?.message || String(error);
+    const status = Number(error?.status || error?.code);
+    const quotaExhausted = status === 429 || /RESOURCE_EXHAUSTED|quota|rate.?limit|too many requests/i.test(details);
+    console.error('Error generando emblema heráldico:', quotaExhausted ? 'Cuota de Gemini agotada o límite alcanzado.' : details);
+    res.statusCode = quotaExhausted ? 429 : 502;
     return res.end(JSON.stringify({
       success: false,
-      error: 'No fue posible generar la imagen heráldica con IA. Verifica disponibilidad y cuota del modelo de imágenes.',
+      code: quotaExhausted ? 'GEMINI_QUOTA_EXHAUSTED' : 'HERALDRY_IMAGE_UNAVAILABLE',
+      error: quotaExhausted
+        ? 'La cuota disponible para generar imágenes con IA está agotada. Conserva el emblema vectorial y vuelve a intentarlo cuando la cuota esté disponible.'
+        : 'No fue posible generar la imagen heráldica con IA. Se conserva el emblema vectorial; inténtalo más tarde.',
     }));
   }
 }
