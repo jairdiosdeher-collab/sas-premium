@@ -138,7 +138,7 @@ Reglas obligatorias:
         .replace(/[—–]/g, '-')
         .replace(/•/g, '-')
         .replace(/…/g, '...')
-        .replace(/[^\\u0000-\\u00FF]/g, '');
+        .replace(/[^\u0000-\u00FF]/g, '');
       const printableName = safeText(fullName || 'Nombre personal');
       pdf.setTextColor(24, 38, 59);
       pdf.setFont('helvetica', 'bold');
@@ -190,7 +190,7 @@ Reglas obligatorias:
         y = 20;
       }
       pdf.text(footerLines, margin, y);
-      const fileSlug = printableName.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'personal';
+      const fileSlug = printableName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'personal';
       pdf.save(`informe-mi-nombre-${fileSlug}.pdf`);
     } catch (downloadError) {
       console.error('Error al generar el PDF de Mi nombre ante la Palabra:', downloadError);
