@@ -4,6 +4,8 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 
+import { StripeServerService } from './src/services/stripeServerService';
+
 dotenv.config();
 
 const app = express();
@@ -18,6 +20,26 @@ app.get('/favicon.ico', (_req, res) => {
 app.get('/favicon.svg', (_req, res) => {
   res.sendFile(path.resolve('public/favicon.svg'));
 });
+
+// Endpoint de Webhook de Stripe: DEBE ir antes de express.json() para recibir el body en buffer crudo y verificar la firma
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    try {
+      const sig = req.headers['stripe-signature'] as string | undefined;
+      const rawBody = req.body;
+      const result = await StripeServerService.processWebhookEvent(rawBody, sig);
+      if (!result.success) {
+        return res.status(400).send(`Webhook Error: ${result.message}`);
+      }
+      return res.status(200).json(result);
+    } catch (err: any) {
+      console.error('Error no controlado en webhook de Stripe:', err?.message || err);
+      return res.status(500).send(`Server Error: ${err?.message}`);
+    }
+  }
+);
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -79,22 +101,38 @@ app.post('/api/gemini/generate', async (req, res) => {
     if (systemInstruction) config.systemInstruction = systemInstruction;
     if (responseMimeType) config.responseMimeType = responseMimeType;
 
+    const callWithTimeout = async <T>(fn: () => Promise<T>, timeoutMs: number): Promise<T> => {
+      let timer: NodeJS.Timeout;
+      const timeoutPromise = new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timeout de ${timeoutMs}ms excedido en Gemini API`)), timeoutMs);
+      });
+      try {
+        return await Promise.race([fn(), timeoutPromise]);
+      } finally {
+        clearTimeout(timer!);
+      }
+    };
+
     try {
-      const response = await ai.models.generateContent({
+      const response = await callWithTimeout(() => ai!.models.generateContent({
         model: 'gemini-3.8-flash',
         contents: prompt,
         config: Object.keys(config).length > 0 ? config : undefined,
-      });
+      }), 12000);
       responseText = response.text || '';
     } catch (primaryErr: any) {
-      console.warn('Aviso: gemini-3.8-flash no respondió, intentando con gemini-3.1-flash-lite:', primaryErr?.message || primaryErr);
+      console.warn('Aviso: gemini-3.8-flash no respondió o agotó tiempo, intentando con gemini-3.1-flash-lite:', primaryErr?.message || primaryErr);
       modelUsed = 'gemini-3.1-flash-lite';
-      const fallbackResponse = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
-        contents: prompt,
-        config: Object.keys(config).length > 0 ? config : undefined,
-      });
-      responseText = fallbackResponse.text || '';
+      try {
+        const fallbackResponse = await callWithTimeout(() => ai!.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: prompt,
+          config: Object.keys(config).length > 0 ? config : undefined,
+        }), 8000);
+        responseText = fallbackResponse.text || '';
+      } catch (fallbackErr: any) {
+        console.warn('Fallback gemini-3.1-flash-lite tampoco respondió:', fallbackErr?.message || fallbackErr);
+      }
     }
 
     if (!responseText.trim()) {
@@ -126,22 +164,79 @@ app.post('/api/gemini/generate', async (req, res) => {
   }
 });
 
+// Diagnóstico y estado de la pasarela Stripe
+app.get('/api/stripe/status', (_req, res) => {
+  return res.json(StripeServerService.getStatus());
+});
+
+// Creación de sesión real de Stripe Checkout
 app.post('/api/stripe/create-checkout', async (req, res) => {
   try {
-    const { priceId, plan, userEmail, userId, couponCode } = req.body;
-    return res.json({
-      success: true,
-      sessionId: `cs_test_${Date.now()}`,
+    const { plan, billingCycle, userEmail, userId, couponCode } = req.body;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.get('host') || `localhost:${PORT}`;
+    const hostUrl = `${protocol}://${host}`;
+
+    const result = await StripeServerService.createCheckoutSession({
       plan,
-      priceId,
+      billingCycle,
       userEmail,
-      message: 'Sesión de Stripe Checkout lista para producción.',
+      userId,
+      couponCode,
+      hostUrl,
     });
+
+    if (!result.success) {
+      const statusCode = result.error?.code === 'STRIPE_NOT_CONFIGURED' ? 503 : 400;
+      return res.status(statusCode).json(result);
+    }
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    console.error('Error en /api/stripe/create-checkout:', error?.message || error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: error?.message || 'Error interno del servidor procesando la solicitud de pago.',
+      },
+    });
+  }
+});
+
+// Verificación segura de sesión tras retorno del navegador
+app.get('/api/stripe/verify-session', async (req, res) => {
+  try {
+    const sessionId = req.query.session_id as string;
+    if (!sessionId) {
+      return res.status(400).json({ success: false, verified: false, error: 'Parámetro session_id requerido.' });
+    }
+    const result = await StripeServerService.verifyCheckoutSession(sessionId);
+    return res.json(result);
   } catch (error: any) {
     return res.status(500).json({
       success: false,
-      error: error?.message || 'Error iniciando sesión de pago Stripe',
+      verified: false,
+      error: error?.message || 'Error verificando sesión de pago con Stripe.',
     });
+  }
+});
+
+// Creación de sesión de Customer Portal para gestionar o cancelar suscripción en Stripe
+app.post('/api/stripe/create-portal', async (req, res) => {
+  try {
+    const { customerId } = req.body;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.get('host') || `localhost:${PORT}`;
+    const hostUrl = `${protocol}://${host}`;
+
+    const result = await StripeServerService.createPortalSession(customerId, hostUrl);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error?.message });
   }
 });
 

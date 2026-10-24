@@ -1,0 +1,1061 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  Shield, 
+  BookOpen, 
+  Sparkles, 
+  Loader2, 
+  AlertTriangle, 
+  Download, 
+  Copy, 
+  Check, 
+  Info, 
+  ChevronRight, 
+  ChevronLeft,
+  Scroll, 
+  HeartHandshake, 
+  Palette, 
+  Printer, 
+  RefreshCw,
+  Search,
+  FileText,
+  Compass,
+  Landmark,
+  Crown,
+  Users,
+  Feather,
+  CheckCircle2,
+  Lock
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { 
+  CompleteNameReport, 
+  NameSearchRequest, 
+  ReportDepth, 
+  ChristianTradition, 
+  ShieldPalette, 
+  ShieldChargeSymbol 
+} from '../../types/nameHeraldry';
+import { 
+  NameHeraldryService, 
+  HERALDIC_PALETTES, 
+  SHIELD_CHARGES 
+} from '../../services/nameHeraldryService';
+import { UserProfile } from '../../types';
+
+interface NameHeraldryModuleProps {
+  currentUser: UserProfile;
+  onOpenBilling?: () => void;
+  onDeductCredit?: () => void;
+}
+
+export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
+  currentUser,
+  onOpenBilling,
+  onDeductCredit,
+}) => {
+  // Wizard steps: 1 = Nombres, 2 = Contexto Familiar, 3 = Profundidad & Opciones
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  // Form input states
+  const [firstName, setFirstName] = useState('');
+  const [middleName, setMiddleName] = useState('');
+  const [firstSurname, setFirstSurname] = useState('');
+  const [secondSurname, setSecondSurname] = useState('');
+  const [countryOrRegion, setCountryOrRegion] = useState('');
+  const [familyContext, setFamilyContext] = useState('');
+  const [depth, setDepth] = useState<ReportDepth>('completa');
+  const [tradition, setTradition] = useState<ChristianTradition>('interdenominacional');
+
+  // Shield customization states
+  const [selectedPalette, setSelectedPalette] = useState<ShieldPalette>(HERALDIC_PALETTES[0]);
+  const [selectedCharge, setSelectedCharge] = useState<ShieldChargeSymbol>('cruz_flordelisada');
+  const [customMotto, setCustomMotto] = useState('');
+
+  // Execution & presentation states
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [report, setReport] = useState<CompleteNameReport | null>(null);
+  const [activeSection, setActiveSection] = useState<'A' | 'B' | 'C' | 'D' | 'E' | 'F'>('A');
+  const [isCopied, setIsCopied] = useState(false);
+  const [isExportingPng, setIsExportingPng] = useState(false);
+
+  // Full name preview
+  const previewFullName = useMemo(() => {
+    return [firstName.trim(), middleName.trim(), firstSurname.trim(), secondSurname.trim()]
+      .filter(Boolean)
+      .join(' ');
+  }, [firstName, middleName, firstSurname, secondSurname]);
+
+  // Live SVG render
+  const currentShieldSvg = useMemo(() => {
+    return NameHeraldryService.generateShieldSvg({
+      firstName: firstName || 'David',
+      surname: firstSurname || 'Hernández',
+      palette: selectedPalette,
+      charge: selectedCharge,
+      customMotto: customMotto || report?.emblem.suggestedMotto,
+    });
+  }, [firstName, firstSurname, selectedPalette, selectedCharge, report, customMotto]);
+
+  // Verification if user has access or available credits
+  const hasCredits = (currentUser.credits ?? 0) > 0;
+  const isFreePlan = currentUser.plan === 'free';
+  const isGated = isFreePlan && !hasCredits;
+
+  const handleNextStep = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (currentStep === 1) {
+      if (!firstName.trim()) {
+        setErrorMessage('Por favor ingresa al menos tu primer nombre para continuar.');
+        return;
+      }
+      if (!firstSurname.trim()) {
+        setErrorMessage('Por favor ingresa tu primer apellido para continuar.');
+        return;
+      }
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      setCurrentStep(3);
+    }
+  };
+
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (!firstName.trim() || !firstSurname.trim()) {
+      setErrorMessage('Nombre y primer apellido son requeridos.');
+      setCurrentStep(1);
+      return;
+    }
+
+    if (isGated) {
+      setErrorMessage('Has alcanzado el límite de créditos de tu plan. Explora nuestros planes para continuar investigando.');
+      if (onOpenBilling) onOpenBilling();
+      return;
+    }
+
+    setIsLoading(true);
+
+    const request: NameSearchRequest = {
+      firstName: firstName.trim(),
+      middleName: middleName.trim() || undefined,
+      firstSurname: firstSurname.trim(),
+      secondSurname: secondSurname.trim() || undefined,
+      countryOrRegion: countryOrRegion.trim() || undefined,
+      familyContext: familyContext.trim() || undefined,
+      depth,
+      tradition,
+    };
+
+    try {
+      const generated = await NameHeraldryService.generateReport(request);
+      setReport(generated);
+      setActiveSection('A');
+
+      if (onDeductCredit && hasCredits) {
+        onDeductCredit();
+      }
+
+      try {
+        confetti({
+          particleCount: 70,
+          spread: 60,
+          origin: { y: 0.6 }
+        });
+      } catch (_e) {}
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'No fue posible generar el informe. Por favor reintenta.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDownloadTxt = () => {
+    if (!report) return;
+    NameHeraldryService.exportReportAsTxt(report);
+  };
+
+  const handleDownloadSvg = () => {
+    const filename = firstSurname || firstName || 'Heraldica';
+    NameHeraldryService.downloadShieldSvg(currentShieldSvg, filename);
+  };
+
+  const handleDownloadPng = async () => {
+    setIsExportingPng(true);
+    try {
+      const filename = firstSurname || firstName || 'Heraldica';
+      await NameHeraldryService.exportShieldAsPng(currentShieldSvg, filename);
+    } catch (err) {
+      console.error('Error al exportar PNG:', err);
+    } finally {
+      setIsExportingPng(false);
+    }
+  };
+
+  const handleCopySummary = () => {
+    if (!report) return;
+    const txt = `${report.presentation.submittedFullName} — MI NOMBRE ANTE LA PALABRA\n\n` +
+      `Origen: ${report.etymology.linguisticOrigin}\n` +
+      `Significado: ${report.etymology.traditionalMeaning}\n` +
+      `Reflexión: ${report.biblical.devotionalReflection.identityAndPurposeMessage}\n` +
+      `Lema: ${report.emblem.suggestedMotto}\n` +
+      `Síntesis: ${report.synthesis.summaryFindings}`;
+
+    navigator.clipboard.writeText(txt);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 text-slate-100">
+      
+      {/* 1. Encabezado Oficial del Módulo */}
+      <div className="relative rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 border border-amber-500/30 p-6 sm:p-8 overflow-hidden shadow-2xl">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-3xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold">
+              <Scroll className="w-3.5 h-3.5 text-amber-400" />
+              <span>Estudio IA · Módulo Ministerial y Devocional</span>
+            </div>
+            
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight font-serif">
+              Mi Nombre ante la Palabra
+            </h1>
+            <p className="text-xs sm:text-sm text-amber-200/80 font-serif italic">
+              Identidad, significado, reflexión bíblica y emblema personal.
+            </p>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans pt-1">
+              Explora el posible origen y significado de tu nombre y apellidos, conéctalos con reflexiones bíblicas pertinentes y crea un emblema simbólico personal, sin afirmar que el nombre determina tu personalidad, destino, espiritualidad o linaje familiar.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
+            <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 text-right">
+              <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Créditos IA Restantes</span>
+              <span className="text-xl font-black text-amber-400">{currentUser.credits ?? 0}</span>
+              <span className="text-[10px] text-slate-500 ml-1">disponibles</span>
+            </div>
+
+            {isGated && onOpenBilling && (
+              <button
+                type="button"
+                onClick={onOpenBilling}
+                className="px-4 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Crown className="w-4 h-4" />
+                <span>Ver Planes</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Alerta de Límite de Plan si no tiene créditos */}
+      {isGated && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start sm:items-center justify-between gap-3 text-xs text-amber-200">
+          <div className="flex items-center gap-2.5">
+            <Lock className="w-5 h-5 text-amber-400 shrink-0" />
+            <span>
+              Has utilizado tus créditos de exploración inicial. Para generar nuevos informes personalizados y análisis en alta definición, consulta nuestros planes ministeriales.
+            </span>
+          </div>
+          {onOpenBilling && (
+            <button
+              onClick={onOpenBilling}
+              className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shrink-0 hover:bg-amber-400"
+            >
+              Ver Planes
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Grid: Formulario en Pasos (Izq) y Emblema Simbólico en Vivo (Der) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Formulario en Pasos (7 Cols) */}
+        <div className="lg:col-span-7 bg-slate-900/80 rounded-3xl border border-slate-800 p-6 space-y-6 shadow-xl backdrop-blur-sm">
+          
+          {/* Indicador de Pasos del Asistente */}
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <Compass className="w-4 h-4 text-amber-400" />
+                <span>Paso {currentStep} de 3</span>
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className="text-xs text-slate-400 font-medium">
+                {currentStep === 1 && 'Identificación y Nombres'}
+                {currentStep === 2 && 'Contexto Familiar Opcional'}
+                {currentStep === 3 && 'Profundidad de la Investigación'}
+              </span>
+            </div>
+
+            {/* Pastillas de navegación de pasos */}
+            <div className="flex items-center gap-1.5">
+              {[1, 2, 3].map((stepNum) => (
+                <button
+                  key={stepNum}
+                  type="button"
+                  onClick={() => setCurrentStep(stepNum as any)}
+                  className={`w-6 h-6 rounded-full text-[11px] font-bold transition-all flex items-center justify-center ${
+                    currentStep === stepNum
+                      ? 'bg-amber-500 text-slate-950 font-black ring-2 ring-amber-400/50'
+                      : currentStep > stepNum
+                      ? 'bg-slate-800 text-amber-300'
+                      : 'bg-slate-950 text-slate-600 border border-slate-800'
+                  }`}
+                >
+                  {currentStep > stepNum ? <Check className="w-3.5 h-3.5" /> : stepNum}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* PASO 1: Identificación y Nombres */}
+          {currentStep === 1 && (
+            <form onSubmit={handleNextStep} className="space-y-4 animate-fade-in">
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Ingresa tus datos personales de consulta. La información es tratada bajo estricta confidencialidad.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Nombre Principal <span className="text-amber-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={60}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Ej. David, Sara, Juan, María..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Segundo Nombre <span className="text-slate-500 text-[10px]">(opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={60}
+                    value={middleName}
+                    onChange={(e) => setMiddleName(e.target.value)}
+                    placeholder="Ej. Esteban, Isabel..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Primer Apellido <span className="text-amber-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={60}
+                    value={firstSurname}
+                    onChange={(e) => setFirstSurname(e.target.value)}
+                    placeholder="Ej. Hernández, Rodríguez, Gómez..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Segundo Apellido <span className="text-slate-500 text-[10px]">(opcional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={60}
+                    value={secondSurname}
+                    onChange={(e) => setSecondSurname(e.target.value)}
+                    placeholder="Ej. Silva, Morales, Castro..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">
+                  País o Región Familiar de Referencia <span className="text-slate-500 text-[10px]">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  maxLength={100}
+                  value={countryOrRegion}
+                  onChange={(e) => setCountryOrRegion(e.target.value)}
+                  placeholder="Ej. Colombia, México, España, Chile, Argentina..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
+                >
+                  <span>Continuar a Contexto Familiar</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* PASO 2: Contexto Familiar Opcional */}
+          {currentStep === 2 && (
+            <form onSubmit={handleNextStep} className="space-y-4 animate-fade-in">
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <Info className="w-4 h-4 text-amber-400" />
+                  <span>Información aportada voluntariamente por el usuario</span>
+                </span>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Cualquier dato genealógico o tradición familiar que aportes será incorporado únicamente como contexto provisto por ti. De acuerdo con la ética académica y heráldica, no se deducen parentescos, ascendencia ni nobleza sin pruebas documentales.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">
+                  Tradición oral, origen de antepasados o notas de linaje <span className="text-slate-500 text-[10px]">(opcional)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={400}
+                  value={familyContext}
+                  onChange={(e) => setFamilyContext(e.target.value)}
+                  placeholder="Ej. Mis abuelos maternos migraron a la capital en 1940; tradición de servicio comunitario y labor educativa..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">
+                  Tradición Cristiana Preferida <span className="text-slate-500 text-[10px]">(opcional)</span>
+                </label>
+                <select
+                  value={tradition}
+                  onChange={(e) => setTradition(e.target.value as ChristianTradition)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="interdenominacional">Interdenominacional / Ecuménica Amplia</option>
+                  <option value="evangelica">Evangélica / Protestante Histórica</option>
+                  <option value="reformada">Reformada / Presbiteriana</option>
+                  <option value="catolica">Católica / Tradición Patrística</option>
+                  <option value="pentecostal">Pentecostal / Carismática</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1.5"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Atrás</span>
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
+                >
+                  <span>Continuar a Selección de Enfoque</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* PASO 3: Selector de Profundidad y Generación */}
+          {currentStep === 3 && (
+            <form onSubmit={handleGenerate} className="space-y-5 animate-fade-in">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-white block">
+                  Selecciona la Profundidad del Informe:
+                </label>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    {
+                      id: 'completa',
+                      title: 'Exploración Completa',
+                      desc: 'Etimología, exégesis bíblica en hebreo/griego, contexto familiar, devocional y emblema.',
+                    },
+                    {
+                      id: 'biblico',
+                      title: 'Enfoque Bíblico',
+                      desc: 'Énfasis en pasajes, lenguas originales, contexto literario y aplicación devocional.',
+                    },
+                    {
+                      id: 'etimologico_heraldico',
+                      title: 'Etimológico & Heráldico',
+                      desc: 'Historia filológica, tradición familiar y propuesta de emblema simbólico.',
+                    },
+                  ].map((option) => (
+                    <div
+                      key={option.id}
+                      onClick={() => setDepth(option.id as ReportDepth)}
+                      className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                        depth === option.id
+                          ? 'bg-amber-500/15 border-amber-500 text-amber-200 shadow-md ring-1 ring-amber-500/50'
+                          : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="font-bold text-xs text-white">{option.title}</p>
+                          {depth === option.id && <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />}
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          {option.desc}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resumen previo de verificación */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1 text-xs text-slate-300">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Resumen de la consulta:</span>
+                <p><strong>Consultante:</strong> {previewFullName || firstName}</p>
+                <p><strong>Región:</strong> {countryOrRegion || 'No especificada'}</p>
+                <p><strong>Profundidad:</strong> {depth === 'completa' ? 'Exploración completa (6 secciones)' : depth === 'biblico' ? 'Enfoque bíblico exegético' : 'Enfoque etimológico y heráldico'}</p>
+              </div>
+
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              <div className="pt-2 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1.5"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Atrás</span>
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs shadow-xl shadow-amber-500/20 active:scale-98 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Consultando fuentes y analizando datos con IA...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-slate-950" />
+                      <span>Generar Informe «Mi Nombre ante la Palabra»</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+        </div>
+
+        {/* Panel Derecho: Personalizador y Renderizador SVG del Emblema (5 Cols) */}
+        <div className="lg:col-span-5 bg-slate-900/80 rounded-3xl border border-slate-800 p-6 space-y-5 shadow-xl backdrop-blur-sm">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Shield className="w-5 h-5 text-amber-400" />
+              <span>Emblema Simbólico Personal</span>
+            </h2>
+            <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono">
+              Vector SVG
+            </span>
+          </div>
+
+          {/* Renderizador Gráfico en Pergamino */}
+          <div className="relative rounded-2xl bg-[#f8f4ea] p-4 shadow-inner border border-amber-900/20 flex flex-col items-center">
+            <div 
+              className="w-full max-w-xs drop-shadow-md transition-all duration-300"
+              dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
+            />
+          </div>
+
+          {/* Controles de Personalización del Emblema */}
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-amber-400" />
+                <span>Esmaltes y Metales Simbólicos</span>
+              </label>
+              <div className="grid grid-cols-5 gap-2">
+                {HERALDIC_PALETTES.map((pal) => (
+                  <button
+                    key={pal.id}
+                    type="button"
+                    title={`${pal.name}: ${pal.symbolicMeaning}`}
+                    onClick={() => setSelectedPalette(pal)}
+                    className={`h-9 rounded-xl border flex items-center justify-center p-1 transition-all ${
+                      selectedPalette.id === pal.id 
+                        ? 'ring-2 ring-amber-400 scale-105 border-white' 
+                        : 'border-slate-800 hover:border-slate-600'
+                    }`}
+                    style={{ backgroundColor: pal.field }}
+                  >
+                    <div className="w-3.5 h-3.5 rounded-full border border-black/30" style={{ backgroundColor: pal.accent }} />
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400 italic">
+                {selectedPalette.name}: {selectedPalette.symbolicMeaning}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300">Figura Simbólica Central</label>
+              <select
+                value={selectedCharge}
+                onChange={(e) => setSelectedCharge(e.target.value as ShieldChargeSymbol)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+              >
+                {SHIELD_CHARGES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.concept}) — {c.meaning}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-300">Lema Espiritual Personalizado <span className="text-slate-500 text-[10px]">(opcional)</span></label>
+              <input
+                type="text"
+                maxLength={40}
+                value={customMotto}
+                onChange={(e) => setCustomMotto(e.target.value)}
+                placeholder="Ej. SOLI DEO GLORIA, LA VERDAD NOS HARÁ LIBRES..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-serif"
+              />
+            </div>
+          </div>
+
+          {/* Botones de Descarga del Emblema */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={handleDownloadSvg}
+              className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span>Descargar SVG</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPng}
+              disabled={isExportingPng}
+              className="py-2.5 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              {isExportingPng ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5 text-amber-400" />}
+              <span>Descargar PNG HD</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* 2. Panel de Resultados con las 6 Secciones Estructuradas (A a F) */}
+      {report && (
+        <div className="mt-8 rounded-3xl bg-slate-900 border border-amber-500/30 p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
+          
+          {/* Barra Superior de Acciones y Metadatos */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+            <div>
+              <span className="text-[10px] text-amber-400 uppercase font-black tracking-widest block font-mono">
+                INFORME PASTORAL Y ACADÉMICO CERTIFICADO
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white font-serif mt-0.5">
+                {report.presentation.submittedFullName}
+              </h2>
+              <p className="text-xs text-slate-400">
+                Emitido el {new Date(report.generatedAt).toLocaleDateString('es-ES', { dateStyle: 'long' })} • Fuente: {report.source === 'gemini-live' ? 'Inteligencia Artificial Gemini Live' : 'Motor Especializado PastoralMente'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopySummary}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                {isCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{isCopied ? 'Copiado' : 'Copiar Resumen'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadTxt}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <FileText className="w-4 h-4 text-amber-400" />
+                <span>Descargar TXT</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimir / PDF</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Pestañas de las 6 Secciones A-F */}
+          <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+            {[
+              { id: 'A', label: 'A. Presentación del Nombre', icon: Feather },
+              { id: 'B', label: 'B. Exploración Etimológica', icon: BookOpen },
+              { id: 'C', label: 'C. Reflexión Bíblica', icon: Scroll },
+              { id: 'D', label: 'D. Contexto Familiar', icon: Users },
+              { id: 'E', label: 'E. Emblema Simbólico', icon: Shield },
+              { id: 'F', label: 'F. Síntesis Final & Fuentes', icon: Landmark },
+            ].map((section) => {
+              const Icon = section.icon;
+              const isActive = activeSection === section.id;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => setActiveSection(section.id as any)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                    isActive
+                      ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                      : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{section.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Contenido Dinámico de las 6 Secciones */}
+          <div className="space-y-5 min-h-[350px]">
+            
+            {/* SECCIÓN A: Presentación del Nombre */}
+            {activeSection === 'A' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN A</span>
+                  <h3 className="text-lg font-bold text-white font-serif">
+                    Presentación del Nombre y Apellidos
+                  </h3>
+                  
+                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                    <p className="text-xs text-slate-300">
+                      <strong>Nombre Aportado:</strong> <span className="text-amber-200">{report.presentation.submittedFullName}</span>
+                    </p>
+                    {report.presentation.spellingVariants && report.presentation.spellingVariants.length > 0 && (
+                      <p className="text-xs text-slate-400">
+                        <strong>Variantes Ortográficas Documentadas:</strong> {report.presentation.spellingVariants.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Aclaración sobre los Límites de la Interpretación */}
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 leading-relaxed flex items-start gap-3">
+                  <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-amber-300 block mb-0.5">Aclaración sobre los límites de la interpretación:</span>
+                    <p>{report.presentation.scopeAndLimitsNotice}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECCIÓN B: Exploración Etimológica */}
+            {activeSection === 'B' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN B</span>
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <h3 className="text-lg font-bold text-white font-serif">
+                      Origen Lingüístico: {report.etymology.linguisticOrigin}
+                    </h3>
+                    <span className="text-[10px] bg-slate-800 text-amber-300 border border-slate-700 px-2.5 py-0.5 rounded-full uppercase font-semibold">
+                      Certeza: {report.etymology.certaintyLevel.replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
+                    <p>
+                      <strong>Significado Tradicionalmente Atribuido:</strong> {report.etymology.traditionalMeaning}
+                    </p>
+                    <p className="text-slate-400">
+                      <strong>Fundamento y Certeza:</strong> {report.etymology.certaintyExplanation}
+                    </p>
+                  </div>
+
+                  {report.etymology.consultableSources && (
+                    <div className="pt-2 border-t border-slate-800/80">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block mb-1">Fuentes Onomásticas Consultables:</span>
+                      <ul className="space-y-1 text-xs text-slate-300">
+                        {report.etymology.consultableSources.map((source, idx) => (
+                          <li key={idx} className="flex items-center gap-1.5">
+                            <span className="text-amber-400">•</span>
+                            <span>{source}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SECCIÓN C: Reflexión Bíblica */}
+            {activeSection === 'C' && (
+              <div className="space-y-5 animate-fade-in">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN C</span>
+                  
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 className="text-lg font-bold text-white font-serif">
+                      Pasajes Bíblicos y Contexto Exegético
+                    </h3>
+                    {report.biblical.hasBiblicalConnection && (
+                      <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-mono">
+                        {report.biblical.originalLanguageScript} ({report.biblical.transliteration})
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Pasajes Bíblicos */}
+                  <div className="space-y-3">
+                    {report.biblical.biblicalPassages.map((p, idx) => (
+                      <div key={idx} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-amber-300 font-mono">{p.reference}</span>
+                        </div>
+                        <p className="text-sm font-serif italic text-white leading-relaxed">
+                          «{p.passageText}»
+                        </p>
+                        <p className="text-xs text-slate-400 leading-relaxed border-t border-slate-800/60 pt-2">
+                          <strong>Contexto Literario e Histórico:</strong> {p.literaryAndHistoricalContext}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Reflexión Devocional de Identidad y Propósito */}
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 to-amber-950/20 border border-amber-500/20 space-y-2">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                      Enseñanza Devocional: {report.biblical.devotionalReflection.coreTheme}
+                    </span>
+                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line font-sans">
+                      {report.biblical.devotionalReflection.narrative}
+                    </p>
+                    <p className="text-xs text-amber-200/90 italic pt-1">
+                      {report.biblical.devotionalReflection.identityAndPurposeMessage}
+                    </p>
+                  </div>
+
+                  {/* Tres Preguntas de Reflexión */}
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                      Preguntas para la Reflexión Personal:
+                    </span>
+                    <ul className="space-y-2 text-xs text-slate-300">
+                      {report.biblical.reflectionQuestions.map((q, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-amber-400 font-bold">{i + 1}.</span>
+                          <span>{q}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Oración Opcional */}
+                  {report.biblical.optionalPrayer && (
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                      <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider block">Oración Opcional (Voluntaria):</span>
+                      <p className="text-xs text-slate-300 italic font-serif leading-relaxed">
+                        «{report.biblical.optionalPrayer}»
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Aviso Teológico Obligatorio */}
+                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                    <strong>Aviso teológico:</strong> {report.biblical.theologicalBoundaryNote}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECCIÓN D: Reflexión Familiar Opcional */}
+            {activeSection === 'D' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN D</span>
+                  <h3 className="text-lg font-bold text-white font-serif">
+                    Contexto Familiar y Memoria Histórica
+                  </h3>
+
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+                    <span className="text-xs font-bold text-amber-300 block">Información Aportada por el Consultante:</span>
+                    <p className="text-xs text-slate-300 leading-relaxed italic">
+                      "{report.family.providedContextText}"
+                    </p>
+                  </div>
+
+                  {/* Aviso Crítico Obligatorio */}
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 leading-relaxed flex items-start gap-2.5">
+                    <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{report.family.criticalNotice}</span>
+                  </div>
+
+                  {/* Consejos de Investigación Genealógica */}
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                      Rutas de Verificación en Archivos Históricos:
+                    </span>
+                    <ul className="space-y-1.5 text-xs text-slate-300">
+                      {report.family.researchAdvice.map((advice, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                          <span>{advice}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECCIÓN E: Emblema Simbólico */}
+            {activeSection === 'E' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN E</span>
+                  <h3 className="text-lg font-bold text-white font-serif">
+                    Emblema Personal Simbólico
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
+                      <p>
+                        <strong>Concepto Inspirador:</strong> <span className="text-amber-300 font-bold">{report.emblem.conceptTheme}</span>
+                      </p>
+                      <p>
+                        <strong>Símbolos y Cargas:</strong> {report.emblem.symbolsDescription}
+                      </p>
+                      <p>
+                        <strong>Paleta de Colores:</strong> {report.emblem.colorPaletteExplanation}
+                      </p>
+                      <p>
+                        <strong>Lema Propuesto:</strong> <span className="font-serif italic text-white">«{report.emblem.suggestedMotto}»</span>
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-center justify-center p-3 bg-[#f8f4ea] rounded-xl border border-amber-900/20">
+                      <div 
+                        className="w-full max-w-[200px]"
+                        dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Aviso Oficial No Removible */}
+                  <div className="p-3.5 bg-slate-900 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
+                    <strong>Declaración oficial:</strong> {report.emblem.disclaimerNotice}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECCIÓN F: Síntesis Final & Fuentes */}
+            {activeSection === 'F' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN F</span>
+                  <h3 className="text-lg font-bold text-white font-serif">
+                    Síntesis Final y Fuentes Consultadas
+                  </h3>
+
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider block">Resumen de Hallazgos:</span>
+                    <p className="text-xs text-slate-300 leading-relaxed">{report.synthesis.summaryFindings}</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 to-amber-950/20 border border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Reflexión Espiritual Conclusiva:</span>
+                    <p className="text-xs text-slate-300 leading-relaxed italic font-serif">{report.synthesis.spiritualReflection}</p>
+                  </div>
+
+                  {/* Preguntas para Diálogo Familiar */}
+                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider block">
+                      Preguntas para Continuar el Estudio en Familia:
+                    </span>
+                    <ul className="space-y-1.5 text-xs text-slate-300">
+                      {report.synthesis.studyQuestionsForFamily.map((q, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-amber-400 font-bold">{i + 1}.</span>
+                          <span>{q}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Fuentes Verificables */}
+                  <div className="space-y-2 pt-2 border-t border-slate-800">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                      Fuentes y Referencias Verificables:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {report.synthesis.verifiableSources.map((source, i) => (
+                        <div key={i} className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
+                          <p className="font-bold text-white">{source.title}</p>
+                          <p className="text-slate-400">{source.authorOrInstitution}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+        </div>
+      )}
+
+    </div>
+  );
+};

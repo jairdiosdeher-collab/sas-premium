@@ -22,8 +22,13 @@ export interface UserProfile {
   avatarUrl?: string;
   emailVerified?: boolean;
   createdAt?: string;
-  lastLogin?: string;
   twoFactorEnabled?: boolean;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  subscriptionStatus?: 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete';
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
+  lastLogin?: string;
 }
 
 export type RiskLevel = 'bajo' | 'moderado' | 'alto' | 'urgente';

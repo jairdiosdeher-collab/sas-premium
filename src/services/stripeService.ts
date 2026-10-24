@@ -2,7 +2,6 @@ import { PlanType } from '../types';
 
 /**
  * Función utilitaria segura para leer variables de entorno sin provocar excepciones
- * en entornos de producción, desarrollo o AI Studio donde import.meta.env pueda estar restringido.
  */
 function getSafeEnv(key: string, fallback: string = ''): string {
   try {
@@ -19,7 +18,7 @@ export interface StripePlanConfig {
   planId: PlanType;
   name: string;
   priceMonthlyUsd: number;
-  priceId: string;
+  priceAnnualMonthlyUsd: number;
   features: string[];
 }
 
@@ -28,44 +27,51 @@ export const STRIPE_PLANS: Record<PlanType, StripePlanConfig> = {
     planId: 'free',
     name: 'Plan Explorador Gratuito',
     priceMonthlyUsd: 0,
-    priceId: 'price_pastoralmente_free',
-    features: ['3 pacientes activos', 'Notas SOAP básicas', '1 escala clínica', 'Soporte estándar'],
+    priceAnnualMonthlyUsd: 0,
+    features: ['3 pacientes activos', 'Notas SOAP básicas', '1 escala clínica', 'Soporte estándar por comunidad'],
   },
   basico: {
     planId: 'basico',
     name: 'Plan Ministerial Básico',
     priceMonthlyUsd: 19,
-    priceId: getSafeEnv('VITE_STRIPE_PRICE_BASIC', getSafeEnv('VITE_STRIPE_PRICE_BASICO', 'test_basic')),
+    priceAnnualMonthlyUsd: 15,
     features: ['15 pacientes activos', 'Historial clínico completo', '3 escalas psicométricas', 'Generador homilético 5 sermones/mes'],
   },
   profesional: {
     planId: 'profesional',
     name: 'Plan Profesional Clínico & Pastoral',
     priceMonthlyUsd: 49,
-    priceId: getSafeEnv('VITE_STRIPE_PRICE_PRO', getSafeEnv('VITE_STRIPE_PRICE_PROFESIONAL', 'test_pro')),
+    priceAnnualMonthlyUsd: 39,
     features: ['50 pacientes activos', '9 escalas psicométricas con scoring automático', 'CRM y Pipeline ministerial', 'IA Homilética y SOAP ilimitada'],
   },
   premium: {
     planId: 'premium',
     name: 'Plan Premium Multiministerial',
     priceMonthlyUsd: 99,
-    priceId: getSafeEnv('VITE_STRIPE_PRICE_PREMIUM', 'test_premium'),
+    priceAnnualMonthlyUsd: 79,
     features: ['Pacientes ilimitados', 'Múltiples consejeros y pastores', 'Escuela Bíblica y Discipulado', 'Auditoría HIPAA y exportaciones cifradas'],
   },
   enterprise: {
     planId: 'enterprise',
     name: 'Plan Red Denominacional Enterprise',
     priceMonthlyUsd: 199,
-    priceId: getSafeEnv('VITE_STRIPE_PRICE_ENTERPRISE', 'test_enterprise'),
+    priceAnnualMonthlyUsd: 159,
     features: ['Soporte para múltiples iglesias filiales', 'Base de datos Firestore dedicada', 'SLA 99.9% y soporte prioritario 24/7'],
   },
 };
+
+export interface StripeBackendStatus {
+  configured: boolean;
+  mode: 'live' | 'test' | 'not_configured';
+  webhookConfigured: boolean;
+  publishableKey?: string;
+  message: string;
+}
 
 export interface StripeModeInfo {
   isConfigured: boolean;
   isLive: boolean;
   isTest: boolean;
-  isDemo: boolean;
   statusMessage: string;
   label: string;
   badgeClass: string;
@@ -73,203 +79,251 @@ export interface StripeModeInfo {
 }
 
 export class StripeService {
-  /**
-   * Obtiene la publishable key de manera 100% segura
-   */
-  private static getPublishableKeySafe(): string {
+  private static cachedStatus: StripeBackendStatus | null = null;
+  private static lastStatusCheck = 0;
+
+  public static getPublishableKey(): string {
     return getSafeEnv('VITE_STRIPE_PUBLISHABLE_KEY', '');
   }
 
   /**
-   * Determina si la llave configurada es de producción real
+   * Consulta el estado real del backend de Stripe (/api/stripe/status)
    */
-  public static isLiveMode(): boolean {
-    try {
-      const key = this.getPublishableKeySafe();
-      return key.startsWith('pk_live_');
-    } catch (_e) {
-      return false;
+  public static async fetchBackendStatus(forceRefresh = false): Promise<StripeBackendStatus> {
+    const now = Date.now();
+    if (!forceRefresh && this.cachedStatus && now - this.lastStatusCheck < 30000) {
+      return this.cachedStatus;
     }
-  }
 
-  /**
-   * Determina si la llave configurada es un test key real (no demo genérico)
-   */
-  public static isTestMode(): boolean {
     try {
-      const key = this.getPublishableKeySafe();
-      return key.startsWith('pk_test_') && key !== 'pk_test_demo' && !key.includes('placeholder');
-    } catch (_e) {
-      return false;
-    }
-  }
-
-  /**
-   * Verifica si Stripe está configurado correctamente con credenciales reales.
-   * Si no está configurado, la aplicación nunca falla y activa el modo seguro.
-   */
-  public static isConfigured(): boolean {
-    try {
-      const key = this.getPublishableKeySafe();
-      if (!key || key === 'pk_test_demo' || key === 'placeholder' || key.trim() === '') {
-        return false;
+      const res = await fetch('/api/stripe/status');
+      if (res.ok) {
+        const data = await res.json();
+        this.cachedStatus = data;
+        this.lastStatusCheck = now;
+        return data;
       }
-      return this.isLiveMode() || this.isTestMode();
-    } catch (_e) {
-      return false;
+    } catch (e) {
+      console.warn('No se pudo verificar el estado de Stripe en el servidor:', e);
     }
+
+    // Fallback basado en publishable key local si el backend no responde
+    const pubKey = this.getPublishableKey();
+    const isLive = pubKey.startsWith('pk_live_');
+    const isTest = pubKey.startsWith('pk_test_') && !pubKey.includes('demo');
+    const configured = isLive || isTest;
+
+    const fallbackStatus: StripeBackendStatus = {
+      configured,
+      mode: isLive ? 'live' : isTest ? 'test' : 'not_configured',
+      webhookConfigured: false,
+      message: configured
+        ? `Stripe detectado en modo ${isLive ? 'Live' : 'Test'}.`
+        : 'Stripe no configurado en el servidor (falta STRIPE_SECRET_KEY).',
+    };
+    this.cachedStatus = fallbackStatus;
+    this.lastStatusCheck = now;
+    return fallbackStatus;
   }
 
   /**
-   * Retorna información descriptiva del estado de la suscripción/pasarela
+   * Obtiene la información visual del estado de Stripe
    */
-  public static getModeInfo(): StripeModeInfo {
+  public static getModeInfo(status?: StripeBackendStatus | null): StripeModeInfo {
+    const pubKey = this.getPublishableKey();
+    const isLive = status?.mode === 'live' || pubKey.startsWith('pk_live_');
+    const isTest = status?.mode === 'test' || (pubKey.startsWith('pk_test_') && !pubKey.includes('demo'));
+    const isConfigured = status ? status.configured : (isLive || isTest);
+
+    if (isLive) {
+      return {
+        isConfigured: true,
+        isLive: true,
+        isTest: false,
+        statusMessage: 'Stripe Producción Activo',
+        label: 'Stripe Producción (Live)',
+        badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+        description: 'Pasarela de pagos en vivo conectada con Stripe. Transacciones monetarias reales.',
+      };
+    }
+
+    if (isTest) {
+      return {
+        isConfigured: true,
+        isLive: false,
+        isTest: true,
+        statusMessage: 'Stripe Sandbox de Prueba (Test Mode)',
+        label: 'Stripe Sandbox (Test)',
+        badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+        description: 'Pasarela conectada en entorno de pruebas de Stripe. Utiliza tarjetas de prueba 4242.',
+      };
+    }
+
+    return {
+      isConfigured: false,
+      isLive: false,
+      isTest: false,
+      statusMessage: 'Stripe Requiere Configuración',
+      label: 'Stripe No Configurado',
+      badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+      description: 'El servidor no tiene configurada la variable STRIPE_SECRET_KEY. Configure sus claves en el servidor para procesar cobros reales.',
+    };
+  }
+
+  /**
+   * Crea una sesión real en Stripe Checkout y devuelve la URL para redirigir
+   * NUNCA genera identificadores ficticios ni simula cobros falsos.
+   */
+  public static async createCheckoutSession(params: {
+    plan: PlanType;
+    billingCycle?: 'monthly' | 'annual';
+    userEmail: string;
+    userId: string;
+    userName?: string;
+    couponCode?: string;
+  }): Promise<{
+    success: boolean;
+    url?: string;
+    sessionId?: string;
+    error?: string;
+    errorCode?: string;
+  }> {
+    if (params.plan === 'free') {
+      return {
+        success: true,
+        error: undefined,
+      };
+    }
+
     try {
-      if (this.isLiveMode()) {
+      const response = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: params.plan,
+          billingCycle: params.billingCycle || 'annual',
+          userEmail: params.userEmail,
+          userId: params.userId,
+          userName: params.userName,
+          couponCode: params.couponCode,
+          successUrl: `${window.location.origin}/?payment=success&session_id={CHECKOUT_SESSION_ID}&plan=${params.plan}`,
+          cancelUrl: `${window.location.origin}/?payment=cancelled`,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
         return {
-          isConfigured: true,
-          isLive: true,
-          isTest: false,
-          isDemo: false,
-          statusMessage: 'Stripe Producción Activo',
-          label: 'Stripe Producción',
-          badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-          description: 'Pasarela de pagos en vivo activa y conectada con Stripe.',
+          success: false,
+          error: data.error || `Error del servidor Stripe (${response.status})`,
+          errorCode: data.code || 'HTTP_ERROR',
         };
       }
 
-      if (this.isTestMode()) {
-        return {
-          isConfigured: true,
-          isLive: false,
-          isTest: true,
-          isDemo: true,
-          statusMessage: 'Stripe Sandbox de Prueba',
-          label: 'Stripe Modo Test',
-          badgeClass: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-          description: 'Pasarela en modo de pruebas con credenciales sandbox.',
-        };
-      }
-
-      // Si Stripe no está configurado correctamente:
-      return {
-        isConfigured: false,
-        isLive: false,
-        isTest: false,
-        isDemo: true,
-        statusMessage: 'Sistema de suscripciones en configuración',
-        label: 'Suscripciones en Configuración',
-        badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-        description: 'Sistema de suscripciones en configuración. Plataforma en modo demostración sin cargos.',
-      };
-    } catch (_e) {
-      return {
-        isConfigured: false,
-        isLive: false,
-        isTest: false,
-        isDemo: true,
-        statusMessage: 'Sistema de suscripciones en configuración',
-        label: 'Suscripciones en Configuración',
-        badgeClass: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-        description: 'Sistema en modo seguro.',
-      };
-    }
-  }
-
-  public static getPublishableKey(): string {
-    return this.getPublishableKeySafe();
-  }
-
-  public static getPriceIdForPlan(plan: PlanType): string {
-    try {
-      return STRIPE_PLANS[plan]?.priceId || 'price_demo_plan';
-    } catch (_e) {
-      return 'price_demo_plan';
-    }
-  }
-
-  /**
-   * Prepara e inicia una sesión de checkout de Stripe.
-   * Si Stripe no está configurado correctamente:
-   * - desactiva temporalmente el sistema de pagos externo;
-   * - evita que la aplicación falle;
-   * - activa el plan en modo demo inmediatamente;
-   * - permite acceder al resto de la plataforma sin interrupciones.
-   */
-  public static async createCheckoutSession(
-    plan: PlanType,
-    userEmail: string,
-    userId: string,
-    couponCode?: string
-  ): Promise<{ success: boolean; checkoutUrl?: string; message: string; priceId: string; isDemo: boolean }> {
-    try {
-      const planConfig = STRIPE_PLANS[plan] || STRIPE_PLANS.profesional;
-      const priceId = planConfig.priceId;
-
-      // Si Stripe NO está configurado con claves en vivo, no invocar checkout externo:
-      if (!this.isConfigured() || !this.isLiveMode()) {
-        await new Promise((resolve) => setTimeout(resolve, 400));
+      if (data.url) {
         return {
           success: true,
-          message: `Sistema de suscripciones en configuración: Plan ${planConfig.name} activado en modo demostración.`,
-          priceId,
-          isDemo: true,
+          url: data.url,
+          sessionId: data.sessionId,
         };
       }
 
-      // Solo intentar checkout si está en modo Live configurado
-      try {
-        const response = await fetch('/api/stripe/create-checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            priceId,
-            plan,
-            userEmail,
-            userId,
-            couponCode,
-            publishableKey: this.getPublishableKeySafe(),
-            successUrl: `${window.location.origin}/?payment=success&plan=${plan}`,
-            cancelUrl: `${window.location.origin}/?payment=cancelled`,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.url) {
-            return {
-              success: true,
-              checkoutUrl: data.url,
-              message: 'Redirigiendo a pasarela Stripe segura...',
-              priceId,
-              isDemo: false,
-            };
-          }
-        }
-      } catch (err) {
-        console.warn('Pasarela Stripe no respondió; activando fallback seguro:', err);
-      }
-
-      // Fallback seguro: activar sin bloquear jamás al usuario
       return {
-        success: true,
-        message: `Plan ${planConfig.name} activado en modo seguro de contingencia.`,
-        priceId,
-        isDemo: true,
+        success: false,
+        error: 'El servidor de Stripe no devolvió la URL de redirección.',
+        errorCode: 'NO_CHECKOUT_URL',
       };
-    } catch (unexpectedError) {
-      console.warn('Aviso controlado en createCheckoutSession:', unexpectedError);
+    } catch (err: any) {
       return {
-        success: true,
-        message: 'Sistema de suscripciones en configuración. Plan activado en modo demostración.',
-        priceId: 'price_demo_plan',
-        isDemo: true,
+        success: false,
+        error: err?.message || 'Error de conexión con el servidor de pagos.',
+        errorCode: 'NETWORK_ERROR',
       };
     }
   }
 
   /**
-   * Valida cupones de descuento institucionales de forma segura
+   * Verifica formalmente una sesión de checkout completada con el servidor
+   */
+  public static async verifyCheckoutSession(sessionId: string): Promise<{
+    verified: boolean;
+    plan?: PlanType;
+    customerId?: string;
+    subscriptionId?: string;
+    amountTotal?: number;
+    currency?: string;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`/api/stripe/verify-session?session_id=${encodeURIComponent(sessionId)}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        return {
+          verified: false,
+          error: data.error || 'No se pudo verificar la sesión de pago.',
+        };
+      }
+
+      return {
+        verified: data.verified === true,
+        plan: data.plan,
+        customerId: data.customerId,
+        subscriptionId: data.subscriptionId,
+        amountTotal: data.amountTotal,
+        currency: data.currency,
+        message: data.message,
+      };
+    } catch (err: any) {
+      return {
+        verified: false,
+        error: err?.message || 'Error de red al verificar la sesión.',
+      };
+    }
+  }
+
+  /**
+   * Crea una sesión en el Portal del Cliente de Stripe (Customer Portal)
+   */
+  public static async createPortalSession(customerId: string): Promise<{
+    success: boolean;
+    url?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch('/api/stripe/create-portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId,
+          returnUrl: `${window.location.origin}/`,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.error || 'No se pudo generar la sesión del portal.',
+        };
+      }
+
+      return {
+        success: true,
+        url: data.url,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Error al conectar con el portal de Stripe.',
+      };
+    }
+  }
+
+  /**
+   * Valida cupones de descuento institucionales de forma estricta
    */
   public static validateCoupon(code: string): { valid: boolean; discountPercent: number; name?: string } {
     try {

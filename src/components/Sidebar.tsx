@@ -13,6 +13,7 @@ import {
   Share2,
   Settings,
   ShieldCheck,
+  Shield,
   Flame,
   Clock,
   Heart,
@@ -40,6 +41,7 @@ export type ModuleKey =
   | 'sermons'
   | 'smallgroups'
   | 'pastoral'
+  | 'name_heraldry'
   | 'aistudio'
   | 'reports'
   | 'analytics'
@@ -73,33 +75,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
     administrador: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
       'assessments', 'calendar', 'tasks', 'portal', 'documents', 'library',
-      'sermons', 'smallgroups', 'pastoral', 'aistudio', 'reports', 'analytics', 
+      'sermons', 'smallgroups', 'pastoral', 'name_heraldry', 'aistudio', 'reports', 'analytics', 
       'marketing', 'affiliates', 'settings'
     ],
     psicologo: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
       'assessments', 'calendar', 'tasks', 'portal', 'documents', 'library',
-      'aistudio', 'reports', 'settings'
+      'name_heraldry', 'aistudio', 'reports', 'settings'
     ],
     pastor: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'calendar', 'tasks',
       'portal', 'documents', 'library', 'sermons', 'smallgroups', 'pastoral',
-      'aistudio', 'reports', 'settings'
+      'name_heraldry', 'aistudio', 'reports', 'settings'
     ],
     supervisor: [
       'dashboard', 'patients', 'timeline', 'evolution', 'assessments', 'tasks',
-      'documents', 'library', 'reports', 'analytics', 'settings'
+      'documents', 'library', 'name_heraldry', 'reports', 'analytics', 'settings'
     ],
     invitado: [
-      'dashboard', 'sermons', 'smallgroups', 'library', 'aistudio', 'marketing'
+      'dashboard', 'sermons', 'smallgroups', 'name_heraldry', 'library', 'aistudio', 'marketing'
     ],
     consejero: [
       'dashboard', 'crm_pipeline', 'patients', 'timeline', 'evolution', 
-      'calendar', 'tasks', 'portal', 'library', 'pastoral', 'aistudio', 'reports', 'settings'
+      'calendar', 'tasks', 'portal', 'library', 'pastoral', 'name_heraldry', 'aistudio', 'reports', 'settings'
     ],
     director_ministerio: [
       'dashboard', 'crm_pipeline', 'patients', 'calendar', 'tasks', 'library',
-      'sermons', 'smallgroups', 'pastoral', 'analytics', 'settings'
+      'sermons', 'smallgroups', 'pastoral', 'name_heraldry', 'analytics', 'settings'
     ],
   };
 
@@ -133,6 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { key: 'calendar', label: 'Agenda & WhatsApp', icon: Calendar, category: 'clinico' },
 
     // Ministerial & Homilético
+    { key: 'name_heraldry', label: 'Mi Nombre ante la Palabra', icon: Shield, category: 'pastoral', badge: 'Nuevo' },
     { key: 'sermons', label: 'Productor de Sermones 10.0', icon: BookOpen, category: 'pastoral', badge: 'IA v10' },
     { key: 'library', label: 'Biblioteca Clínica & Pastoral', icon: BookOpen, category: 'pastoral', badge: '7 Dominios' },
     { key: 'smallgroups', label: 'Grupos Pequeños & Células', icon: UsersRound, category: 'pastoral' },

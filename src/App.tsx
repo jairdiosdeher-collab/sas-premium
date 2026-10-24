@@ -57,6 +57,7 @@ import { PatientPortalModule } from './components/modules/PatientPortalModule';
 import { DocumentCenterModule } from './components/modules/DocumentCenterModule';
 import { ClinicalLibraryModule } from './components/modules/ClinicalLibraryModule';
 import { TasksAndFollowupModule } from './components/modules/TasksAndFollowupModule';
+import { NameHeraldryModule } from './components/modules/NameHeraldryModule';
 import { SmartAlertsDrawer } from './components/common/SmartAlertsDrawer';
 import { VoiceDictationModal } from './components/common/VoiceDictationModal';
 import { AlertsService } from './services/alertsService';
@@ -65,6 +66,8 @@ import { SecurityLockModal } from './components/common/SecurityLockModal';
 import { FirebaseStatusModal } from './components/common/FirebaseStatusModal';
 import { AuthModal } from './components/auth/AuthModals';
 import { FirebaseService } from './services/firebaseService';
+import { StripeService } from './services/stripeService';
+import confetti from 'canvas-confetti';
 
 function AppContent() {
   const { currentUser, updateUser } = useAuth();
@@ -143,6 +146,60 @@ function AppContent() {
       });
     }
   }, [currentUser?.id]);
+
+  // Escuchar retorno de Stripe Checkout (?payment=success&session_id=... o ?payment=cancelled)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const paymentStatus = params.get('payment');
+      const sessionId = params.get('session_id');
+
+      if (paymentStatus === 'success') {
+        if (sessionId) {
+          showInfo('Verificando Pago', 'Validando sesión con los servidores de Stripe...');
+          StripeService.verifyCheckoutSession(sessionId).then((result) => {
+            if (result.verified && result.plan) {
+              const bonusCredits = 
+                result.plan === 'basico' ? 50 :
+                result.plan === 'profesional' ? 250 :
+                result.plan === 'premium' ? 1000 : 5000;
+
+              updateUser({
+                plan: result.plan,
+                stripeCustomerId: result.customerId || currentUser.stripeCustomerId,
+                stripeSubscriptionId: result.subscriptionId || currentUser.stripeSubscriptionId,
+                subscriptionStatus: 'active',
+                credits: (currentUser.credits || 0) + bonusCredits,
+              });
+
+              try {
+                confetti({
+                  particleCount: 150,
+                  spread: 100,
+                  origin: { y: 0.5 },
+                });
+              } catch (_e) {}
+
+              showSuccess(
+                '¡Suscripción Confirmada!',
+                `Pago verificado por Stripe. Tu cuenta ahora tiene acceso al Plan ${result.plan.toUpperCase()}.`
+              );
+            } else {
+              showError(
+                'Verificación de Pago Fallida',
+                result.error || 'Stripe no pudo confirmar la liquidación de la transacción.'
+              );
+            }
+          });
+        }
+        // Limpiar URL para no reejecutar
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (paymentStatus === 'cancelled') {
+        showInfo('Proceso Cancelado', 'La sesión de pago en Stripe fue cancelada. No se realizó ningún cargo.');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (_e) {}
+  }, []);
 
   // Sync to local storage & Firestore offline-first sync (pacientes, SOAP, agenda, reportes, etc.)
   useEffect(() => {
@@ -535,6 +592,21 @@ function AppContent() {
                 patients={patients}
                 onAddPrayerRequest={handleAddPrayerRequest}
                 onAddMilestone={handleAddMilestone}
+              />
+            )}
+
+            {currentModule === 'name_heraldry' && (
+              <NameHeraldryModule
+                currentUser={currentUser}
+                onOpenBilling={() => {
+                  setBillingInitialPlan('profesional');
+                  setIsBillingOpen(true);
+                }}
+                onDeductCredit={() => {
+                  if (currentUser.credits && currentUser.credits > 0) {
+                    updateUser({ credits: currentUser.credits - 1 });
+                  }
+                }}
               />
             )}
 
