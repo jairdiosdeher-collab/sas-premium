@@ -1,6 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { GoogleGenAI } from '@google/genai';
 
+function isQuotaError(error: any): boolean {
+  const details = `${error?.status || ''} ${error?.code || ''} ${error?.message || error || ''}`;
+  return /429|RESOURCE_EXHAUSTED|quota|rate.?limit|too many requests/i.test(details);
+}
+
 async function parseBody(req: IncomingMessage): Promise<any> {
   if ((req as any).body) {
     return (req as any).body;
@@ -81,7 +86,11 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       });
       responseText = response.text || '';
     } catch (err: any) {
-      console.warn('Vercel Gemini 3.8 Flash aviso, intentando con 3.1 Flash Lite:', err?.message || err);
+      if (isQuotaError(err)) {
+        // No consumir más solicitudes cuando el error indica cuota agotada.
+        throw err;
+      }
+      console.warn('Vercel Gemini 3.8 Flash no disponible; intentando con 3.1 Flash Lite:', err?.message || err);
       modelUsed = 'gemini-3.1-flash-lite';
       const fallbackResponse = await ai.models.generateContent({
         model: 'gemini-3.1-flash-lite',
@@ -107,12 +116,15 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       environment: 'vercel-serverless',
     }));
   } catch (error: any) {
-    const errorMessage = error?.message || String(error);
-    console.error('Error en Vercel Gemini handler:', errorMessage);
-    res.statusCode = 502;
+    const quotaExhausted = isQuotaError(error);
+    const errorMessage = quotaExhausted
+      ? 'La cuota disponible de Gemini está agotada o se alcanzó un límite. Se intentará usar el motor local de la aplicación sin hacer más solicitudes a Gemini.'
+      : 'Gemini no está disponible temporalmente. Se intentará usar el motor local de la aplicación.';
+    console.error('Error en Vercel Gemini handler:', quotaExhausted ? 'Cuota agotada; se detienen los reintentos.' : (error?.message || error));
+    res.statusCode = quotaExhausted ? 429 : 502;
     return res.end(JSON.stringify({
       success: false,
-      error: { code: 'GEMINI_API_ERROR', message: errorMessage },
+      error: { code: quotaExhausted ? 'GEMINI_QUOTA_EXHAUSTED' : 'GEMINI_API_ERROR', message: errorMessage },
     }));
   }
 }
