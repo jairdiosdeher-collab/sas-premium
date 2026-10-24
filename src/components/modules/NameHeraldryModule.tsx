@@ -253,8 +253,10 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
       setGeneratedShieldImage(result.imageDataUrl);
       setShieldImageNotice('Ilustración generada por IA (' + result.modelUsed + '). Se usará también en la portada impresa/PDF.');
     } catch (error: any) {
-      setShieldImageNotice('No se pudo generar la imagen con IA. Se conserva el emblema vectorial actual; puedes volver a intentarlo.');
-      console.error('Error generando ilustración heráldica:', error);
+      // Garantizar que el emblema SVG local sea el recurso activo si Gemini falla.
+      setGeneratedShieldImage(null);
+      setShieldImageNotice('No se pudo generar la imagen con IA. Se utilizará el escudo vectorial local, que también se incluirá en el PDF.');
+      console.error('Error generando ilustración heráldica; se usa el escudo SVG local:', error);
     } finally {
       setIsGeneratingShieldImage(false);
     }
@@ -692,7 +694,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
           <div className="relative rounded-2xl bg-[#f8f4ea] p-3 sm:p-5 shadow-inner border border-amber-900/20 flex flex-col items-center justify-center overflow-visible">
             <div className="w-full max-w-[280px] sm:max-w-[340px] md:max-w-[380px] shield-svg-wrapper drop-shadow-md transition-all duration-300">
               {generatedShieldImage ? (
-                <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${previewFullName || 'tu nombre'}`} className="heraldry-generated-image w-full h-full object-contain" />
+                <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${previewFullName || 'tu nombre'}`} className="heraldry-generated-image w-full h-full object-contain" onError={() => { setGeneratedShieldImage(null); setShieldImageNotice('La imagen de IA no se pudo cargar. Se restauró el escudo vectorial local para la pantalla y el PDF.'); }} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center" dangerouslySetInnerHTML={{ __html: currentShieldSvg }} />
               )}
