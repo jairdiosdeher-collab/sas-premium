@@ -109,23 +109,27 @@ Reglas obligatorias:
     let imageUrl: string | undefined;
     try {
       // Convertir el SVG actual a PNG para que el emblema quede incrustado en el PDF.
-      const svgBlob = new Blob([shieldSvg], { type: 'image/svg+xml;charset=utf-8' });
-      imageUrl = URL.createObjectURL(svgBlob);
+      // Usar un SVG codificado como data URI evita fallos de carga del Blob URL
+      // en algunos navegadores y permite rasterizar el emblema antes de crear el PDF.
+      const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(shieldSvg)}`;
       const emblemImage = await new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error('No se pudo preparar el emblema para el PDF.'));
-        image.src = imageUrl!;
+        image.onerror = () => reject(new Error('No se pudo cargar el emblema simbólico para el PDF.'));
+        image.src = svgDataUrl;
       });
       const canvas = document.createElement('canvas');
-      canvas.width = 900;
-      canvas.height = 1080;
+      canvas.width = 1200;
+      canvas.height = 1440;
       const context = canvas.getContext('2d');
       if (!context) throw new Error('El navegador no permite preparar la imagen del emblema.');
       context.fillStyle = '#f8f4ea';
       context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(emblemImage, 0, 0, canvas.width, canvas.height);
       const emblemPng = canvas.toDataURL('image/png');
+      if (!emblemPng.startsWith('data:image/png;base64,') || canvas.width < 1 || canvas.height < 1) {
+        throw new Error('La conversión del emblema a PNG no produjo una imagen válida.');
+      }
 
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -146,7 +150,9 @@ Reglas obligatorias:
       pdf.text('MI NOMBRE ANTE LA PALABRA', pageWidth / 2, 20, { align: 'center', maxWidth: textWidth });
       pdf.setFontSize(14);
       pdf.text(printableName, pageWidth / 2, 29, { align: 'center', maxWidth: textWidth });
-      pdf.addImage(emblemPng, 'PNG', (pageWidth - 76) / 2, 35, 76, 91, undefined, 'FAST');
+      // Incrustar el PNG con compresión sin pérdida y un alias explícito para evitar
+      // que jsPDF reutilice por error otra imagen en documentos con varias páginas.
+      pdf.addImage(emblemPng, 'PNG', (pageWidth - 76) / 2, 35, 76, 91, 'emblema-personal-mi-nombre', 'NONE');
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
