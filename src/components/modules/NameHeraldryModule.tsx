@@ -247,10 +247,10 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16 text-slate-100">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 text-slate-100 print:text-slate-900 print:max-w-none print:p-0 print:m-0">
       
-      {/* 1. Encabezado Oficial del Módulo */}
-      <div className="relative rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 border border-amber-500/30 p-6 sm:p-8 overflow-hidden shadow-2xl">
+      {/* 1. Encabezado Oficial del Módulo (Solo pantalla) */}
+      <div className="no-print relative rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/30 border border-amber-500/30 p-6 sm:p-8 overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -292,9 +292,9 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
         </div>
       </div>
 
-      {/* Alerta Informativa si el usuario no tiene créditos */}
+      {/* Alerta Informativa si el usuario no tiene créditos (Solo pantalla) */}
       {isGated && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start sm:items-center justify-between gap-3 text-xs text-amber-200">
+        <div className="no-print p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start sm:items-center justify-between gap-3 text-xs text-amber-200">
           <div className="flex items-center gap-2.5">
             <Lock className="w-5 h-5 text-amber-400 shrink-0" />
             <span>
@@ -313,7 +313,8 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
       )}
 
       {/* Grid: Formulario en Pasos (Izq) y Emblema Simbólico en Vivo (Der) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Si hay un informe activo, ocultamos el formulario en impresión para centrar el documento impreso */}
+      <div className={`grid grid-cols-1 lg:grid-cols-12 gap-6 items-start ${report ? 'no-print' : ''}`}>
         
         {/* Formulario en Pasos (7 Cols) */}
         <div className="lg:col-span-7 bg-slate-900/80 rounded-3xl border border-slate-800 p-6 space-y-6 shadow-xl backdrop-blur-sm">
@@ -614,23 +615,25 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
         </div>
 
         {/* Panel Derecho: Personalizador y Renderizador SVG del Emblema (5 Cols) */}
-        <div className="lg:col-span-5 bg-slate-900/80 rounded-3xl border border-slate-800 p-6 space-y-5 shadow-xl backdrop-blur-sm">
+        <div className="lg:col-span-5 bg-slate-900/80 rounded-3xl border border-slate-800 p-4 sm:p-6 space-y-5 shadow-xl backdrop-blur-sm">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Shield className="w-5 h-5 text-amber-400" />
               <span>Emblema Simbólico Personal</span>
             </h2>
-            <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono">
-              Vector SVG
+            <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-full font-mono">
+              Vector Proporcional
             </span>
           </div>
 
-          {/* Renderizador Gráfico en Pergamino */}
-          <div className="relative rounded-2xl bg-[#f8f4ea] p-4 shadow-inner border border-amber-900/20 flex flex-col items-center">
-            <div 
-              className="w-full max-w-xs drop-shadow-md transition-all duration-300"
-              dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
-            />
+          {/* Renderizador Gráfico en Pergamino - 100% Adaptable y NUNCA Recortado */}
+          <div className="relative rounded-2xl bg-[#f8f4ea] p-3 sm:p-5 shadow-inner border border-amber-900/20 flex flex-col items-center justify-center overflow-visible">
+            <div className="w-full max-w-[280px] sm:max-w-[340px] md:max-w-[380px] shield-svg-wrapper drop-shadow-md transition-all duration-300">
+              <div 
+                className="w-full h-full flex items-center justify-center"
+                dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
+              />
+            </div>
           </div>
 
           {/* Controles de Personalización del Emblema */}
@@ -716,9 +719,9 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
 
       </div>
 
-      {/* 2. Panel de Resultados con las 5 Secciones Requeridas (A a E) */}
+      {/* 2. Panel de Resultados con las 5 Secciones Requeridas (A a E) - Pantalla Interactiva */}
       {report && (
-        <div className="mt-8 rounded-3xl bg-slate-900 border border-amber-500/30 p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
+        <div className="no-print mt-8 rounded-3xl bg-slate-900 border border-amber-500/30 p-4 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
           
           {/* Barra Superior de Acciones y Metadatos */}
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
@@ -1067,12 +1070,14 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                       </div>
                     </div>
 
-                    <div className="md:col-span-5 flex flex-col items-center justify-center p-4 bg-[#f8f4ea] rounded-2xl border border-amber-900/20 shadow-inner">
-                      <div 
-                        className="w-full max-w-[210px] drop-shadow-md"
-                        dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
-                      />
-                      <span className="text-[11px] text-slate-700 font-serif italic mt-2 text-center">
+                    <div className="md:col-span-5 flex flex-col items-center justify-center p-4 sm:p-6 bg-[#f8f4ea] rounded-2xl border border-amber-900/20 shadow-inner overflow-visible">
+                      <div className="w-full max-w-[280px] sm:max-w-[340px] md:max-w-[380px] shield-svg-wrapper drop-shadow-md">
+                        <div 
+                          className="w-full h-full flex items-center justify-center"
+                          dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
+                        />
+                      </div>
+                      <span className="text-xs text-slate-800 font-serif italic mt-3 text-center font-bold">
                         «{customMotto || report.sectionD_Emblem.suggestedMotto}»
                       </span>
                     </div>
@@ -1188,16 +1193,24 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                       </div>
                     </div>
 
-                    {/* Punto 8: Propuesta de emblema y lema */}
-                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
-                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
-                        8
-                      </span>
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Propuesta de Emblema Simbólico y Lema</span>
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                          {report.sectionE_Summary.item8_EmblemProposal} • Lema: <span className="font-serif italic text-white">«{customMotto || report.sectionD_Emblem.suggestedMotto}»</span>
-                        </p>
+                    {/* Punto 8: Propuesta de emblema y lema (Con vista gráfica incrustada) */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1">
+                        <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                          8
+                        </span>
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Propuesta de Emblema Simbólico y Lema</span>
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {report.sectionE_Summary.item8_EmblemProposal} • Lema: <span className="font-serif italic text-white font-bold">«{customMotto || report.sectionD_Emblem.suggestedMotto}»</span>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-24 sm:w-28 shrink-0 bg-[#f8f4ea] p-1.5 rounded-lg border border-amber-900/20 shadow-sm shield-svg-wrapper">
+                        <div 
+                          className="w-full h-full flex items-center justify-center"
+                          dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
+                        />
                       </div>
                     </div>
 
@@ -1234,6 +1247,163 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
 
           </div>
 
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. DOCUMENTO FORMAL PARA IMPRESIÓN Y GUARDADO EN PDF (SOLO IMPRESIÓN)      */}
+      {/* ========================================================================= */}
+      {report && (
+        <div className="hidden print:block text-slate-900 bg-white p-0 space-y-6">
+          
+          {/* PORTADA Y CERTIFICADO DEL EMBLEMA COMPLETO */}
+          <div className="shield-print-page print-break-inside-avoid min-h-[92vh] flex flex-col justify-between items-center text-center p-8 border-4 border-double border-amber-800/40 rounded-2xl bg-[#fdfbf7] shadow-none">
+            <div className="space-y-2">
+              <div className="text-[12px] uppercase font-bold tracking-[0.25em] text-amber-900 font-serif">
+                PastoralMente AI Premium · Certificado Devocional
+              </div>
+              <h1 className="text-3xl font-extrabold font-serif text-slate-900 tracking-tight">
+                Mi Nombre ante la Palabra
+              </h1>
+              <p className="text-sm italic font-serif text-amber-950/80">
+                Identidad, significado, reflexión bíblica y emblema personal
+              </p>
+              <div className="w-24 h-0.5 bg-amber-700/40 mx-auto my-2" />
+              <p className="text-xs text-slate-600">
+                Documento emitido el {new Date(report.generatedAt).toLocaleDateString('es-ES', { dateStyle: 'full' })}
+              </p>
+            </div>
+
+            {/* EMBLEMA CENTRAL COMPLETO, NÍTIDO Y EXACTAMENTE CENTRADO */}
+            <div className="my-4 w-full max-w-[130mm] aspect-[900/1150] shield-svg-wrapper flex items-center justify-center border border-amber-900/20 rounded-2xl bg-[#f8f4ea] p-3 shadow-none">
+              <div 
+                className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:object-contain"
+                dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-2xl font-bold font-serif text-slate-900">
+                {report.sectionA_Name.submittedFullName}
+              </h2>
+              <p className="text-sm italic font-serif text-amber-900 font-bold">
+                « {customMotto || report.sectionD_Emblem.suggestedMotto} »
+              </p>
+              <p className="text-[10px] text-slate-500 pt-3 max-w-xl mx-auto leading-tight">
+                {report.sectionA_Name.scopeAndLimitsNotice}
+              </p>
+            </div>
+          </div>
+
+          {/* PÁGINA 2: ESTUDIO COMPLETO Y FICHA ORGANIZADA (9 PUNTOS) */}
+          <div className="print-page-break space-y-5 pt-4">
+            <div className="border-b-2 border-amber-900/30 pb-2 flex justify-between items-baseline">
+              <div>
+                <h2 className="text-lg font-bold font-serif text-slate-900 uppercase tracking-wide">
+                  Estudio Exegético & Ficha de Identidad
+                </h2>
+                <p className="text-xs text-slate-600">
+                  Consultante: <strong>{report.sectionA_Name.submittedFullName}</strong>
+                </p>
+              </div>
+              <span className="text-[11px] font-mono text-slate-500">
+                Fecha: {new Date(report.generatedAt).toLocaleDateString('es-ES')}
+              </span>
+            </div>
+
+            {/* SECCIÓN A */}
+            <div className="print-break-inside-avoid border border-slate-300 rounded-lg p-3.5 bg-slate-50/60 space-y-1.5 text-xs">
+              <h3 className="font-bold font-serif text-slate-900 text-sm border-b border-slate-200 pb-1">
+                A. Mi Nombre: Origen Filológico y Lingüístico
+              </h3>
+              <p><strong>Origen:</strong> {report.sectionA_Name.linguisticOrigin} <span className="text-slate-600">(Certeza: {report.sectionA_Name.certaintyLevel.replace('_', ' ')})</span></p>
+              <p><strong>Significado Documentado:</strong> {report.sectionA_Name.documentedMeaning}</p>
+              <p><strong>Interpretación Simbólica:</strong> {report.sectionA_Name.symbolicMeaning}</p>
+              <p className="text-slate-600 italic"><strong>Fundamento Metodológico:</strong> {report.sectionA_Name.certaintyExplanation}</p>
+            </div>
+
+            {/* SECCIÓN B */}
+            <div className="print-break-inside-avoid border border-slate-300 rounded-lg p-3.5 bg-slate-50/60 space-y-2 text-xs">
+              <h3 className="font-bold font-serif text-slate-900 text-sm border-b border-slate-200 pb-1">
+                B. Mi Nombre y la Biblia
+              </h3>
+              <p><strong>Conexión Temática:</strong> {report.sectionB_Bible.thematicRelation}</p>
+              {report.sectionB_Bible.originalLanguageScript && (
+                <p><strong>Lengua Original:</strong> {report.sectionB_Bible.originalLanguageScript} {report.sectionB_Bible.transliteration ? `(${report.sectionB_Bible.transliteration})` : ''}</p>
+              )}
+              <div className="space-y-2 pt-1">
+                {report.sectionB_Bible.biblicalPassages.map((p, idx) => (
+                  <div key={idx} className="bg-white p-2.5 rounded border border-slate-200">
+                    <span className="font-bold text-amber-900 font-mono">{p.reference}:</span>
+                    <p className="italic font-serif my-1">«{p.passageText}»</p>
+                    <p className="text-[11px] text-slate-600"><strong>Contexto Literario:</strong> {p.literaryAndHistoricalContext}</p>
+                  </div>
+                ))}
+              </div>
+              <p><strong>Reflexión Pastoral:</strong> {report.sectionB_Bible.pastoralReflection}</p>
+              <div className="pt-1">
+                <strong>Preguntas de Meditación Personal:</strong>
+                <ol className="list-decimal list-inside pl-1 space-y-0.5 text-slate-700">
+                  {report.sectionB_Bible.reflectionQuestions.map((q, i) => (
+                    <li key={i}>{q}</li>
+                  ))}
+                </ol>
+              </div>
+              {report.sectionB_Bible.optionalPrayer && (
+                <p className="italic bg-amber-50 p-2 rounded border border-amber-200 text-amber-950 font-serif">
+                  <strong>Oración:</strong> «{report.sectionB_Bible.optionalPrayer}»
+                </p>
+              )}
+            </div>
+
+            {/* SECCIÓN C */}
+            <div className="print-break-inside-avoid border border-slate-300 rounded-lg p-3.5 bg-slate-50/60 space-y-1.5 text-xs">
+              <h3 className="font-bold font-serif text-slate-900 text-sm border-b border-slate-200 pb-1">
+                C. Identidad y Propósito
+              </h3>
+              <p><strong>Valores:</strong> {report.sectionC_Identity.identityAndValues}</p>
+              <p><strong>Fortalezas y Mayordomía:</strong> {report.sectionC_Identity.strengthsAndService}</p>
+              <p><strong>Orientación Pastoral:</strong> {report.sectionC_Identity.pastoralOrientation}</p>
+            </div>
+
+            {/* SECCIÓN E: FICHA ORGANIZADA (9 PUNTOS) */}
+            <div className="print-break-inside-avoid border-2 border-slate-400 rounded-lg p-3.5 bg-white space-y-2.5 text-xs">
+              <h3 className="font-bold font-serif text-slate-900 text-sm border-b border-slate-300 pb-1 uppercase tracking-wide">
+                E. Ficha Organizada de los 9 Puntos Requeridos
+              </h3>
+              <div className="grid grid-cols-1 gap-1.5">
+                <p><strong>1. Nombre analizado:</strong> {report.sectionE_Summary.item1_AnalyzedName}</p>
+                <p><strong>2. Origen y significado documentado:</strong> {report.sectionE_Summary.item2_DocumentedOriginAndMeaning}</p>
+                <p><strong>3. Interpretación simbólica:</strong> {report.sectionE_Summary.item3_SymbolicInterpretation}</p>
+                <p><strong>4. Pasajes bíblicos y contexto:</strong> {report.sectionE_Summary.item4_BiblicalPassagesAndContext}</p>
+                <p><strong>5. Mensaje pastoral y devocional:</strong> {report.sectionE_Summary.item5_PersonalReflection}</p>
+                <div>
+                  <strong>6. Preguntas abiertas para meditar:</strong>
+                  <ul className="list-disc list-inside pl-2 space-y-0.5">
+                    {report.sectionE_Summary.item6_MeditationQuestions.map((q, i) => (
+                      <li key={i}>{q}</li>
+                    ))}
+                  </ul>
+                </div>
+                <p><strong>7. Oración de consagración:</strong> «{report.sectionE_Summary.item7_OptionalPrayer}»</p>
+                <p><strong>8. Propuesta de emblema simbólico y lema:</strong> {report.sectionE_Summary.item8_EmblemProposal} (Lema: «{customMotto || report.sectionD_Emblem.suggestedMotto}»)</p>
+                <div>
+                  <strong>9. Fuentes consultables:</strong>
+                  <ul className="list-disc list-inside pl-2 space-y-0.5 text-[11px] text-slate-600">
+                    {report.sectionE_Summary.item9_ConsultableSources.map((s, i) => (
+                      <li key={i}>{s.title} ({s.authorOrInstitution})</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {report.familyContextSection && (
+              <div className="print-break-inside-avoid text-[10px] text-slate-500 italic p-2 border-t border-slate-200">
+                * {report.familyContextSection.criticalNotice}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

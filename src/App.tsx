@@ -435,25 +435,27 @@ function AppContent() {
   const smartAlerts = AlertsService.computeSmartAlerts(patients, notes, assessments, appointments);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans print:bg-white print:text-slate-900 print:min-h-0">
       {/* Top Navbar */}
-      <Navbar
-        user={currentUser}
-        activeView={activeView}
-        setActiveView={setActiveView}
-        onOpenBilling={() => {
-          setBillingInitialPlan(currentUser.plan || 'profesional');
-          setIsBillingOpen(true);
-        }}
-        onQuickAction={handleQuickAction}
-        onChangeRole={handleChangeRole}
-        onOpenAuth={() => setIsAuthOpen(true)}
-        onOpenFirebaseStatus={() => setIsFirebaseStatusOpen(true)}
-        onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
-        onOpenAlerts={() => setIsAlertsOpen(true)}
-        activeAlertsCount={smartAlerts.length}
-        onOpenVoiceDictation={() => setIsVoiceDictationOpen(true)}
-      />
+      <div className="no-print">
+        <Navbar
+          user={currentUser}
+          activeView={activeView}
+          setActiveView={setActiveView}
+          onOpenBilling={() => {
+            setBillingInitialPlan(currentUser.plan || 'profesional');
+            setIsBillingOpen(true);
+          }}
+          onQuickAction={handleQuickAction}
+          onChangeRole={handleChangeRole}
+          onOpenAuth={() => setIsAuthOpen(true)}
+          onOpenFirebaseStatus={() => setIsFirebaseStatusOpen(true)}
+          onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
+          onOpenAlerts={() => setIsAlertsOpen(true)}
+          activeAlertsCount={smartAlerts.length}
+          onOpenVoiceDictation={() => setIsVoiceDictationOpen(true)}
+        />
+      </div>
 
       {/* Main View Router */}
       {activeView === 'landing' ? (
@@ -462,20 +464,22 @@ function AppContent() {
           onSelectPlan={(plan) => handleSelectPlanFromLanding(plan)}
         />
       ) : (
-        <div className="flex-1 flex max-w-7xl w-full mx-auto relative">
+        <div className="flex-1 flex max-w-7xl w-full mx-auto relative print:max-w-none print:w-full print:block">
           {/* Left Sidebar con RBAC y Mobile Drawer */}
-          <Sidebar
-            currentModule={currentModule}
-            setCurrentModule={setCurrentModule}
-            crisisCount={crisisCount}
-            userRole={currentUser.role}
-            isMobileOpen={isMobileMenuOpen}
-            onCloseMobile={() => setIsMobileMenuOpen(false)}
-            onOpenFirebaseStatus={() => setIsFirebaseStatusOpen(true)}
-          />
+          <div className="no-print">
+            <Sidebar
+              currentModule={currentModule}
+              setCurrentModule={setCurrentModule}
+              crisisCount={crisisCount}
+              userRole={currentUser.role}
+              isMobileOpen={isMobileMenuOpen}
+              onCloseMobile={() => setIsMobileMenuOpen(false)}
+              onOpenFirebaseStatus={() => setIsFirebaseStatusOpen(true)}
+            />
+          </div>
 
           {/* Module Content Canvas */}
-          <main className="flex-1 p-4 lg:p-6 overflow-y-auto min-h-[calc(100vh-65px)]">
+          <main className="flex-1 p-4 lg:p-6 overflow-y-auto min-h-[calc(100vh-65px)] print:p-0 print:overflow-visible print:min-h-0 print:w-full print:max-w-none print:block">
             {currentModule === 'dashboard' && (
               <DashboardModule
                 user={currentUser}

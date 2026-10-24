@@ -282,14 +282,13 @@ ESTRUCTURA JSON REQUERIDA (debe contener exactamente los siguientes apartados):
 
     const chargeSvg = this.getChargeVector(charge, palette.accent);
 
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1150" width="900" height="1150" role="img" aria-labelledby="title desc">
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1150" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; margin: 0 auto;" role="img" aria-labelledby="title desc">
   <title id="title">Emblema Simbólico de ${escapeXml(firstName)} ${escapeXml(surname)}</title>
   <desc id="desc">${escapeXml(disclaimer)}</desc>
 
   <defs>
-    <filter id="shieldShadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.3"/>
+    <filter id="shieldShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.22"/>
     </filter>
     <radialGradient id="fieldGradient" cx="50%" cy="40%" r="65%">
       <stop offset="0%" stop-color="${escapeXml(palette.field)}" stop-opacity="0.9"/>
@@ -302,7 +301,7 @@ ESTRUCTURA JSON REQUERIDA (debe contener exactamente los siguientes apartados):
     </linearGradient>
   </defs>
 
-  <!-- Lámina Pergamino -->
+  <!-- Lámina Pergamino Completa -->
   <rect width="900" height="1150" fill="#f8f4ea"/>
   <rect x="25" y="25" width="850" height="1100" rx="18" fill="none" stroke="${escapeXml(palette.accent)}" stroke-width="2.5" stroke-dasharray="8 4"/>
   <rect x="35" y="35" width="830" height="1080" rx="14" fill="none" stroke="${escapeXml(palette.accent)}" stroke-width="1"/>
@@ -355,27 +354,27 @@ ESTRUCTURA JSON REQUERIDA (debe contener exactamente los siguientes apartados):
 
   <!-- Cartela / Filacteria con el Apellido -->
   <g filter="url(#shieldShadow)">
-    <path d="M 180 945 
-             L 720 945 
-             L 740 985 
-             L 720 1025 
-             L 180 1025 
-             L 160 985 
+    <path d="M 180 940 
+             L 720 940 
+             L 740 980 
+             L 720 1020 
+             L 180 1020 
+             L 160 980 
              Z" 
           fill="url(#ribbonGradient)" 
           stroke="${escapeXml(palette.borderStroke)}" 
           stroke-width="3"/>
     
-    <rect x="188" y="955" width="524" height="60" fill="none" stroke="#5d430d" stroke-width="1"/>
-    <text x="450" y="995" text-anchor="middle" font-family="'Cinzel', 'Georgia', serif" font-size="32" font-weight="bold" fill="#2d1c02" letter-spacing="4">${escapeXml(cleanSurname)}</text>
+    <rect x="188" y="948" width="524" height="64" fill="none" stroke="#5d430d" stroke-width="1"/>
+    <text x="450" y="990" text-anchor="middle" font-family="'Cinzel', 'Georgia', serif" font-size="32" font-weight="bold" fill="#2d1c02" letter-spacing="4">${escapeXml(cleanSurname)}</text>
   </g>
 
   <!-- Lema Espiritual -->
-  <text x="450" y="1055" text-anchor="middle" font-family="'Georgia', serif" font-style="italic" font-size="16" font-weight="600" fill="${escapeXml(palette.field)}" letter-spacing="2">« ${escapeXml(motto)} »</text>
+  <text x="450" y="1050" text-anchor="middle" font-family="'Georgia', serif" font-style="italic" font-size="16" font-weight="600" fill="${escapeXml(palette.field)}" letter-spacing="2">« ${escapeXml(motto)} »</text>
 
   <!-- Aclaración Ética Obligatoria en Pie de Página -->
-  <text x="450" y="1090" text-anchor="middle" font-family="'Arial', 'Helvetica', sans-serif" font-size="11" font-weight="bold" fill="#716758" letter-spacing="1">${escapeXml(disclaimer)}</text>
-  <text x="450" y="1108" text-anchor="middle" font-family="'Arial', 'Helvetica', sans-serif" font-size="10" fill="#9c9182">PastoralMente SAS PREMIUM · Documento Ilustrativo y Devocional</text>
+  <text x="450" y="1084" text-anchor="middle" font-family="'Arial', 'Helvetica', sans-serif" font-size="11" font-weight="bold" fill="#716758" letter-spacing="1">${escapeXml(disclaimer)}</text>
+  <text x="450" y="1102" text-anchor="middle" font-family="'Arial', 'Helvetica', sans-serif" font-size="10" fill="#9c9182">PastoralMente SAS PREMIUM · Documento Ilustrativo y Devocional</text>
 </svg>`;
   }
 
@@ -717,7 +716,9 @@ PastoralMente AI · Documento protegido para edificación y estudio personal.
    */
   public static downloadShieldSvg(svgString: string, surname: string): void {
     if (!svgString || !svgString.trim()) return;
-    const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    const xmlHeader = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    const content = svgString.startsWith('<?xml') ? svgString : xmlHeader + svgString;
+    const blob = new Blob([content], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
