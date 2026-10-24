@@ -24,7 +24,9 @@ import {
   Users,
   Feather,
   CheckCircle2,
-  Lock
+  Lock,
+  BookmarkPlus,
+  HelpCircle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { 
@@ -75,9 +77,10 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [report, setReport] = useState<CompleteNameReport | null>(null);
-  const [activeSection, setActiveSection] = useState<'A' | 'B' | 'C' | 'D' | 'E' | 'F'>('A');
+  const [activeSection, setActiveSection] = useState<'A' | 'B' | 'C' | 'D' | 'E'>('A');
   const [isCopied, setIsCopied] = useState(false);
   const [isExportingPng, setIsExportingPng] = useState(false);
+  const [isSavedInDevotionals, setIsSavedInDevotionals] = useState(false);
 
   // Full name preview
   const previewFullName = useMemo(() => {
@@ -93,7 +96,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
       surname: firstSurname || 'Hernández',
       palette: selectedPalette,
       charge: selectedCharge,
-      customMotto: customMotto || report?.emblem.suggestedMotto,
+      customMotto: customMotto || report?.sectionD_Emblem.suggestedMotto,
     });
   }, [firstName, firstSurname, selectedPalette, selectedCharge, report, customMotto]);
 
@@ -154,6 +157,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
       const generated = await NameHeraldryService.generateReport(request);
       setReport(generated);
       setActiveSection('A');
+      setIsSavedInDevotionals(false);
 
       if (onDeductCredit && hasCredits) {
         onDeductCredit();
@@ -170,6 +174,37 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
       setErrorMessage(err?.message || 'No fue posible generar el informe. Por favor reintenta.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResetForm = () => {
+    setReport(null);
+    setCurrentStep(1);
+    setIsSavedInDevotionals(false);
+  };
+
+  const handleSaveToDevotionals = () => {
+    if (!report) return;
+
+    try {
+      const savedList = JSON.parse(localStorage.getItem('pastoralmente_devocionales_saved') || '[]');
+      const newEntry = {
+        id: report.id,
+        savedAt: new Date().toISOString(),
+        fullName: report.sectionA_Name.submittedFullName,
+        motto: customMotto || report.sectionD_Emblem.suggestedMotto,
+        scripture: report.sectionB_Bible.biblicalPassages[0]?.reference || 'Escrituras',
+        summary: report.sectionE_Summary.item5_PersonalReflection,
+      };
+
+      const filtered = savedList.filter((item: any) => item.id !== report.id);
+      filtered.unshift(newEntry);
+      localStorage.setItem('pastoralmente_devocionales_saved', JSON.stringify(filtered.slice(0, 50)));
+
+      setIsSavedInDevotionals(true);
+      setTimeout(() => setIsSavedInDevotionals(false), 3000);
+    } catch (err) {
+      console.warn('Error al guardar en devocionales:', err);
     }
   };
 
@@ -197,12 +232,14 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
 
   const handleCopySummary = () => {
     if (!report) return;
-    const txt = `${report.presentation.submittedFullName} — MI NOMBRE ANTE LA PALABRA\n\n` +
-      `Origen: ${report.etymology.linguisticOrigin}\n` +
-      `Significado: ${report.etymology.traditionalMeaning}\n` +
-      `Reflexión: ${report.biblical.devotionalReflection.identityAndPurposeMessage}\n` +
-      `Lema: ${report.emblem.suggestedMotto}\n` +
-      `Síntesis: ${report.synthesis.summaryFindings}`;
+    const txt = `${report.sectionA_Name.submittedFullName} — MI NOMBRE ANTE LA PALABRA\n\n` +
+      `Origen Lingüístico: ${report.sectionA_Name.linguisticOrigin}\n` +
+      `Significado Documentado: ${report.sectionA_Name.documentedMeaning}\n` +
+      `Interpretación Simbólica: ${report.sectionA_Name.symbolicMeaning}\n` +
+      `Cita Bíblica: ${report.sectionB_Bible.biblicalPassages[0]?.reference || ''}\n` +
+      `Reflexión Pastoral: ${report.sectionB_Bible.pastoralReflection}\n` +
+      `Lema: ${customMotto || report.sectionD_Emblem.suggestedMotto}\n` +
+      `Aviso: ${report.sectionA_Name.scopeAndLimitsNotice}`;
 
     navigator.clipboard.writeText(txt);
     setIsCopied(true);
@@ -255,19 +292,19 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
         </div>
       </div>
 
-      {/* Alerta de Límite de Plan si no tiene créditos */}
+      {/* Alerta Informativa si el usuario no tiene créditos */}
       {isGated && (
         <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start sm:items-center justify-between gap-3 text-xs text-amber-200">
           <div className="flex items-center gap-2.5">
             <Lock className="w-5 h-5 text-amber-400 shrink-0" />
             <span>
-              Has utilizado tus créditos de exploración inicial. Para generar nuevos informes personalizados y análisis en alta definición, consulta nuestros planes ministeriales.
+              Has alcanzado el límite de créditos de tu plan. Explora nuestros planes pastorales para continuar investigando en profundidad.
             </span>
           </div>
           {onOpenBilling && (
             <button
               onClick={onOpenBilling}
-              className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shrink-0 hover:bg-amber-400"
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shrink-0 hover:bg-amber-400 cursor-pointer"
             >
               Ver Planes
             </button>
@@ -303,7 +340,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                   key={stepNum}
                   type="button"
                   onClick={() => setCurrentStep(stepNum as any)}
-                  className={`w-6 h-6 rounded-full text-[11px] font-bold transition-all flex items-center justify-center ${
+                  className={`w-6 h-6 rounded-full text-[11px] font-bold transition-all flex items-center justify-center cursor-pointer ${
                     currentStep === stepNum
                       ? 'bg-amber-500 text-slate-950 font-black ring-2 ring-amber-400/50'
                       : currentStep > stepNum
@@ -321,7 +358,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
           {currentStep === 1 && (
             <form onSubmit={handleNextStep} className="space-y-4 animate-fade-in">
               <p className="text-xs text-slate-400 leading-relaxed">
-                Ingresa tus datos personales de consulta. La información es tratada bajo estricta confidencialidad.
+                Ingresa los datos para la investigación filológica y bíblica. La información se procesa bajo estricta confidencialidad pastoral.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -447,27 +484,25 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">
-                  Tradición Cristiana Preferida <span className="text-slate-500 text-[10px]">(opcional)</span>
-                </label>
+                <label className="text-xs font-semibold text-slate-300">Tradición Cristiana de Preferencia</label>
                 <select
                   value={tradition}
                   onChange={(e) => setTradition(e.target.value as ChristianTradition)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
                 >
-                  <option value="interdenominacional">Interdenominacional / Ecuménica Amplia</option>
-                  <option value="evangelica">Evangélica / Protestante Histórica</option>
-                  <option value="reformada">Reformada / Presbiteriana</option>
-                  <option value="catolica">Católica / Tradición Patrística</option>
-                  <option value="pentecostal">Pentecostal / Carismática</option>
+                  <option value="interdenominacional">Interdenominacional (Enfoque ecuménico bíblico amplio)</option>
+                  <option value="evangelica">Evangélica (Énfasis en la gracia y discipulado personal)</option>
+                  <option value="reformada">Reformada (Enfoque teológico en soberanía de Dios y pacto)</option>
+                  <option value="catolica">Católica (Tradición histórica, magisterio y patrística)</option>
+                  <option value="pentecostal">Pentecostal (Énfasis en el poder del Espíritu y vocación viva)</option>
                 </select>
               </div>
 
-              <div className="pt-2 flex items-center justify-between">
+              <div className="pt-2 flex items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => setCurrentStep(1)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Atrás</span>
@@ -477,37 +512,34 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                   type="submit"
                   className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
                 >
-                  <span>Continuar a Selección de Enfoque</span>
+                  <span>Continuar a Profundidad</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </form>
           )}
 
-          {/* PASO 3: Selector de Profundidad y Generación */}
+          {/* PASO 3: Profundidad de la Investigación & Generación */}
           {currentStep === 3 && (
-            <form onSubmit={handleGenerate} className="space-y-5 animate-fade-in">
+            <form onSubmit={handleGenerate} className="space-y-4 animate-fade-in">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-white block">
-                  Selecciona la Profundidad del Informe:
-                </label>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <label className="text-xs font-semibold text-slate-300">Alcance de la Investigación</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {[
                     {
                       id: 'completa',
-                      title: 'Exploración Completa',
-                      desc: 'Etimología, exégesis bíblica en hebreo/griego, contexto familiar, devocional y emblema.',
+                      title: 'Completa (5 Secciones)',
+                      desc: 'Etimología, exégesis bíblica, propósito, emblema simbólico y Ficha organizada de 9 puntos.',
                     },
                     {
                       id: 'biblico',
                       title: 'Enfoque Bíblico',
-                      desc: 'Énfasis en pasajes, lenguas originales, contexto literario y aplicación devocional.',
+                      desc: 'Énfasis en pasajes bíblicos, lenguas originales (hebreo/griego) y aplicación devocional.',
                     },
                     {
                       id: 'etimologico_heraldico',
                       title: 'Etimológico & Heráldico',
-                      desc: 'Historia filológica, tradición familiar y propuesta de emblema simbólico.',
+                      desc: 'Historia filológica, tradición onomástica y diseño de emblema simbólico.',
                     },
                   ].map((option) => (
                     <div
@@ -538,7 +570,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Resumen de la consulta:</span>
                 <p><strong>Consultante:</strong> {previewFullName || firstName}</p>
                 <p><strong>Región:</strong> {countryOrRegion || 'No especificada'}</p>
-                <p><strong>Profundidad:</strong> {depth === 'completa' ? 'Exploración completa (6 secciones)' : depth === 'biblico' ? 'Enfoque bíblico exegético' : 'Enfoque etimológico y heráldico'}</p>
+                <p><strong>Tradición:</strong> {tradition.toUpperCase()}</p>
               </div>
 
               {errorMessage && (
@@ -552,7 +584,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                 <button
                   type="button"
                   onClick={() => setCurrentStep(2)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Atrás</span>
@@ -566,12 +598,12 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Consultando fuentes y analizando datos con IA...</span>
+                      <span>Analizando fuentes académicas y bíblicas con IA...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-slate-950" />
-                      <span>Generar Informe «Mi Nombre ante la Palabra»</span>
+                      <span>Generar «Mi Nombre ante la Palabra»</span>
                     </>
                   )}
                 </button>
@@ -615,7 +647,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                     type="button"
                     title={`${pal.name}: ${pal.symbolicMeaning}`}
                     onClick={() => setSelectedPalette(pal)}
-                    className={`h-9 rounded-xl border flex items-center justify-center p-1 transition-all ${
+                    className={`h-9 rounded-xl border flex items-center justify-center p-1 transition-all cursor-pointer ${
                       selectedPalette.id === pal.id 
                         ? 'ring-2 ring-amber-400 scale-105 border-white' 
                         : 'border-slate-800 hover:border-slate-600'
@@ -684,18 +716,18 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
 
       </div>
 
-      {/* 2. Panel de Resultados con las 6 Secciones Estructuradas (A a F) */}
+      {/* 2. Panel de Resultados con las 5 Secciones Requeridas (A a E) */}
       {report && (
         <div className="mt-8 rounded-3xl bg-slate-900 border border-amber-500/30 p-6 sm:p-8 space-y-6 shadow-2xl animate-fade-in">
           
           {/* Barra Superior de Acciones y Metadatos */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
             <div>
               <span className="text-[10px] text-amber-400 uppercase font-black tracking-widest block font-mono">
-                INFORME PASTORAL Y ACADÉMICO CERTIFICADO
+                INFORME PERSONALIZADO CERTIFICADO
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-white font-serif mt-0.5">
-                {report.presentation.submittedFullName}
+                {report.sectionA_Name.submittedFullName}
               </h2>
               <p className="text-xs text-slate-400">
                 Emitido el {new Date(report.generatedAt).toLocaleDateString('es-ES', { dateStyle: 'long' })} • Fuente: {report.source === 'gemini-live' ? 'Inteligencia Artificial Gemini Live' : 'Motor Especializado PastoralMente'}
@@ -703,28 +735,60 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* Botón: Generar nueva reflexión */}
+              <button
+                type="button"
+                onClick={handleResetForm}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4 text-amber-400" />
+                <span>Nueva Reflexión</span>
+              </button>
+
+              {/* Botón: Guardar en mis Devocionales */}
+              <button
+                type="button"
+                onClick={handleSaveToDevotionals}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                {isSavedInDevotionals ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-300">Guardado</span>
+                  </>
+                ) : (
+                  <>
+                    <BookmarkPlus className="w-4 h-4 text-amber-400" />
+                    <span>Guardar en Devocionales</span>
+                  </>
+                )}
+              </button>
+
+              {/* Botón: Copiar Resumen */}
               <button
                 type="button"
                 onClick={handleCopySummary}
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 {isCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                 <span>{isCopied ? 'Copiado' : 'Copiar Resumen'}</span>
               </button>
 
+              {/* Botón: Descargar TXT */}
               <button
                 type="button"
                 onClick={handleDownloadTxt}
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <FileText className="w-4 h-4 text-amber-400" />
                 <span>Descargar TXT</span>
               </button>
 
+              {/* Botón: Imprimir / PDF */}
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
                 <span>Imprimir / PDF</span>
@@ -732,15 +796,14 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
             </div>
           </div>
 
-          {/* Pestañas de las 6 Secciones A-F */}
+          {/* Pestañas de las 5 Secciones Oficiales (A a E) */}
           <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
             {[
-              { id: 'A', label: 'A. Presentación del Nombre', icon: Feather },
-              { id: 'B', label: 'B. Exploración Etimológica', icon: BookOpen },
-              { id: 'C', label: 'C. Reflexión Bíblica', icon: Scroll },
-              { id: 'D', label: 'D. Contexto Familiar', icon: Users },
-              { id: 'E', label: 'E. Emblema Simbólico', icon: Shield },
-              { id: 'F', label: 'F. Síntesis Final & Fuentes', icon: Landmark },
+              { id: 'A', label: 'A. Mi Nombre', icon: Feather },
+              { id: 'B', label: 'B. Mi Nombre y la Biblia', icon: BookOpen },
+              { id: 'C', label: 'C. Mi Identidad y Propósito', icon: HeartHandshake },
+              { id: 'D', label: 'D. Emblema Simbólico', icon: Shield },
+              { id: 'E', label: 'E. Ficha Organizada (9 Puntos)', icon: Landmark },
             ].map((section) => {
               const Icon = section.icon;
               const isActive = activeSection === section.id;
@@ -762,70 +825,57 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
             })}
           </div>
 
-          {/* Contenido Dinámico de las 6 Secciones */}
+          {/* Contenido de las 5 Secciones Requeridas */}
           <div className="space-y-5 min-h-[350px]">
             
-            {/* SECCIÓN A: Presentación del Nombre */}
+            {/* SECCIÓN A: Mi nombre */}
             {activeSection === 'A' && (
               <div className="space-y-4 animate-fade-in">
                 <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN A</span>
-                  <h3 className="text-lg font-bold text-white font-serif">
-                    Presentación del Nombre y Apellidos
-                  </h3>
-                  
-                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
-                    <p className="text-xs text-slate-300">
-                      <strong>Nombre Aportado:</strong> <span className="text-amber-200">{report.presentation.submittedFullName}</span>
-                    </p>
-                    {report.presentation.spellingVariants && report.presentation.spellingVariants.length > 0 && (
-                      <p className="text-xs text-slate-400">
-                        <strong>Variantes Ortográficas Documentadas:</strong> {report.presentation.spellingVariants.join(', ')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Aclaración sobre los Límites de la Interpretación */}
-                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 leading-relaxed flex items-start gap-3">
-                  <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-amber-300 block mb-0.5">Aclaración sobre los límites de la interpretación:</span>
-                    <p>{report.presentation.scopeAndLimitsNotice}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* SECCIÓN B: Exploración Etimológica */}
-            {activeSection === 'B' && (
-              <div className="space-y-4 animate-fade-in">
-                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
-                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN B</span>
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                    <h3 className="text-lg font-bold text-white font-serif">
-                      Origen Lingüístico: {report.etymology.linguisticOrigin}
-                    </h3>
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN A · MI NOMBRE</span>
                     <span className="text-[10px] bg-slate-800 text-amber-300 border border-slate-700 px-2.5 py-0.5 rounded-full uppercase font-semibold">
-                      Certeza: {report.etymology.certaintyLevel.replace('_', ' ')}
+                      Certeza: {report.sectionA_Name.certaintyLevel.replace('_', ' ')}
                     </span>
                   </div>
 
-                  <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
-                    <p>
-                      <strong>Significado Tradicionalmente Atribuido:</strong> {report.etymology.traditionalMeaning}
-                    </p>
-                    <p className="text-slate-400">
-                      <strong>Fundamento y Certeza:</strong> {report.etymology.certaintyExplanation}
-                    </p>
+                  <h3 className="text-lg font-bold text-white font-serif">
+                    Origen Lingüístico: {report.sectionA_Name.linguisticOrigin}
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                      <span className="text-xs font-bold text-amber-300 block">Significado Documentado:</span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {report.sectionA_Name.documentedMeaning}
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                      <span className="text-xs font-bold text-amber-300 block">Interpretación Simbólica (Diferenciada):</span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {report.sectionA_Name.symbolicMeaning}
+                      </p>
+                    </div>
                   </div>
 
-                  {report.etymology.consultableSources && (
+                  {report.sectionA_Name.knownVariants && report.sectionA_Name.knownVariants.length > 0 && (
+                    <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+                      <p className="text-xs text-slate-400">
+                        <strong>Variantes Ortográficas Documentadas:</strong> {report.sectionA_Name.knownVariants.join(', ')}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
+                    <strong>Fundamento Metodológico:</strong> {report.sectionA_Name.certaintyExplanation}
+                  </div>
+
+                  {report.sectionA_Name.consultableSources && report.sectionA_Name.consultableSources.length > 0 && (
                     <div className="pt-2 border-t border-slate-800/80">
                       <span className="text-[10px] text-slate-400 uppercase font-semibold block mb-1">Fuentes Onomásticas Consultables:</span>
                       <ul className="space-y-1 text-xs text-slate-300">
-                        {report.etymology.consultableSources.map((source, idx) => (
+                        {report.sectionA_Name.consultableSources.map((source, idx) => (
                           <li key={idx} className="flex items-center gap-1.5">
                             <span className="text-amber-400">•</span>
                             <span>{source}</span>
@@ -835,32 +885,44 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* Aclaración Obligatoria sobre Límites de Interpretación */}
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 leading-relaxed flex items-start gap-3">
+                  <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold text-amber-300 block mb-0.5">Aviso sobre los límites de la interpretación:</span>
+                    <p>{report.sectionA_Name.scopeAndLimitsNotice}</p>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* SECCIÓN C: Reflexión Bíblica */}
-            {activeSection === 'C' && (
+            {/* SECCIÓN B: Mi nombre y la Biblia */}
+            {activeSection === 'B' && (
               <div className="space-y-5 animate-fade-in">
                 <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
-                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN C</span>
-                  
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h3 className="text-lg font-bold text-white font-serif">
-                      Pasajes Bíblicos y Contexto Exegético
-                    </h3>
-                    {report.biblical.hasBiblicalConnection && (
-                      <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-mono">
-                        {report.biblical.originalLanguageScript} ({report.biblical.transliteration})
+                    <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN B · MI NOMBRE Y LA BIBLIA</span>
+                    {report.sectionB_Bible.hasBiblicalConnection && report.sectionB_Bible.originalLanguageScript && (
+                      <span className="text-xs bg-amber-500/20 text-amber-300 px-2.5 py-1 rounded-md font-mono border border-amber-500/30">
+                        {report.sectionB_Bible.originalLanguageScript} {report.sectionB_Bible.transliteration ? `(${report.sectionB_Bible.transliteration})` : ''}
                       </span>
                     )}
                   </div>
 
-                  {/* Pasajes Bíblicos */}
+                  <h3 className="text-lg font-bold text-white font-serif">
+                    Conexión Temática: {report.sectionB_Bible.thematicRelation}
+                  </h3>
+
+                  {/* Pasajes Bíblicos Exactos con Contexto Histórico-Literario */}
                   <div className="space-y-3">
-                    {report.biblical.biblicalPassages.map((p, idx) => (
+                    {report.sectionB_Bible.biblicalPassages.map((p, idx) => (
                       <div key={idx} className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-amber-300 font-mono">{p.reference}</span>
+                          <span className="text-xs font-bold text-amber-300 font-mono flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>{p.reference}</span>
+                          </span>
                         </div>
                         <p className="text-sm font-serif italic text-white leading-relaxed">
                           «{p.passageText}»
@@ -872,26 +934,24 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                     ))}
                   </div>
 
-                  {/* Reflexión Devocional de Identidad y Propósito */}
+                  {/* Reflexión Pastoral */}
                   <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 to-amber-950/20 border border-amber-500/20 space-y-2">
                     <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
-                      Enseñanza Devocional: {report.biblical.devotionalReflection.coreTheme}
+                      Reflexión Pastoral y Aplicación Devocional:
                     </span>
                     <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line font-sans">
-                      {report.biblical.devotionalReflection.narrative}
-                    </p>
-                    <p className="text-xs text-amber-200/90 italic pt-1">
-                      {report.biblical.devotionalReflection.identityAndPurposeMessage}
+                      {report.sectionB_Bible.pastoralReflection}
                     </p>
                   </div>
 
-                  {/* Tres Preguntas de Reflexión */}
+                  {/* Tres Preguntas de Meditación Personal */}
                   <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider block">
-                      Preguntas para la Reflexión Personal:
+                    <span className="text-xs font-bold text-white uppercase tracking-wider block flex items-center gap-1.5">
+                      <HelpCircle className="w-4 h-4 text-amber-400" />
+                      <span>Tres Preguntas para la Meditación Personal:</span>
                     </span>
                     <ul className="space-y-2 text-xs text-slate-300">
-                      {report.biblical.reflectionQuestions.map((q, i) => (
+                      {report.sectionB_Bible.reflectionQuestions.map((q, i) => (
                         <li key={i} className="flex items-start gap-2">
                           <span className="text-amber-400 font-bold">{i + 1}.</span>
                           <span>{q}</span>
@@ -900,153 +960,274 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                     </ul>
                   </div>
 
-                  {/* Oración Opcional */}
-                  {report.biblical.optionalPrayer && (
+                  {/* Oración Opcional Voluntaria */}
+                  {report.sectionB_Bible.optionalPrayer && (
                     <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
-                      <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider block">Oración Opcional (Voluntaria):</span>
+                      <span className="text-[10px] text-amber-400 uppercase font-bold tracking-wider block">Oración Devocional (Voluntaria):</span>
                       <p className="text-xs text-slate-300 italic font-serif leading-relaxed">
-                        «{report.biblical.optionalPrayer}»
+                        «{report.sectionB_Bible.optionalPrayer}»
                       </p>
                     </div>
                   )}
 
                   {/* Aviso Teológico Obligatorio */}
                   <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
-                    <strong>Aviso teológico:</strong> {report.biblical.theologicalBoundaryNote}
+                    <strong>Aviso teológico:</strong> {report.sectionB_Bible.theologicalBoundaryNote}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* SECCIÓN D: Reflexión Familiar Opcional */}
-            {activeSection === 'D' && (
+            {/* SECCIÓN C: Mi identidad y propósito */}
+            {activeSection === 'C' && (
               <div className="space-y-4 animate-fade-in">
                 <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
-                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN D</span>
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN C · MI IDENTIDAD Y PROPÓSITO</span>
                   <h3 className="text-lg font-bold text-white font-serif">
-                    Contexto Familiar y Memoria Histórica
-                  </h3>
-
-                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
-                    <span className="text-xs font-bold text-amber-300 block">Información Aportada por el Consultante:</span>
-                    <p className="text-xs text-slate-300 leading-relaxed italic">
-                      "{report.family.providedContextText}"
-                    </p>
-                  </div>
-
-                  {/* Aviso Crítico Obligatorio */}
-                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 leading-relaxed flex items-start gap-2.5">
-                    <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    <span>{report.family.criticalNotice}</span>
-                  </div>
-
-                  {/* Consejos de Investigación Genealógica */}
-                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider block">
-                      Rutas de Verificación en Archivos Históricos:
-                    </span>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
-                      {report.family.researchAdvice.map((advice, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                          <span>{advice}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* SECCIÓN E: Emblema Simbólico */}
-            {activeSection === 'E' && (
-              <div className="space-y-4 animate-fade-in">
-                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
-                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN E</span>
-                  <h3 className="text-lg font-bold text-white font-serif">
-                    Emblema Personal Simbólico
+                    Identidad, Valores y Vocación de Servicio
                   </h3>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
-                      <p>
-                        <strong>Concepto Inspirador:</strong> <span className="text-amber-300 font-bold">{report.emblem.conceptTheme}</span>
-                      </p>
-                      <p>
-                        <strong>Símbolos y Cargas:</strong> {report.emblem.symbolsDescription}
-                      </p>
-                      <p>
-                        <strong>Paleta de Colores:</strong> {report.emblem.colorPaletteExplanation}
-                      </p>
-                      <p>
-                        <strong>Lema Propuesto:</strong> <span className="font-serif italic text-white">«{report.emblem.suggestedMotto}»</span>
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-amber-300 block">Identidad y Valores Fundamentales:</span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {report.sectionC_Identity.identityAndValues}
                       </p>
                     </div>
 
-                    <div className="flex flex-col items-center justify-center p-3 bg-[#f8f4ea] rounded-xl border border-amber-900/20">
-                      <div 
-                        className="w-full max-w-[200px]"
-                        dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
-                      />
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-amber-300 block">Fortalezas y Mayordomía Cristiana:</span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {report.sectionC_Identity.strengthsAndService}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Aviso Oficial No Removible */}
-                  <div className="p-3.5 bg-slate-900 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
-                    <strong>Declaración oficial:</strong> {report.emblem.disclaimerNotice}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* SECCIÓN F: Síntesis Final & Fuentes */}
-            {activeSection === 'F' && (
-              <div className="space-y-4 animate-fade-in">
-                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
-                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN F</span>
-                  <h3 className="text-lg font-bold text-white font-serif">
-                    Síntesis Final y Fuentes Consultadas
-                  </h3>
-
-                  <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider block">Resumen de Hallazgos:</span>
-                    <p className="text-xs text-slate-300 leading-relaxed">{report.synthesis.summaryFindings}</p>
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 to-amber-950/20 border border-amber-500/20 space-y-2">
+                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                      Orientación Pastoral:
+                    </span>
+                    <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                      {report.sectionC_Identity.pastoralOrientation}
+                    </p>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 to-amber-950/20 border border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Reflexión Espiritual Conclusiva:</span>
-                    <p className="text-xs text-slate-300 leading-relaxed italic font-serif">{report.synthesis.spiritualReflection}</p>
-                  </div>
-
-                  {/* Preguntas para Diálogo Familiar */}
+                  {/* Preguntas Abiertas */}
                   <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
                     <span className="text-xs font-bold text-white uppercase tracking-wider block">
-                      Preguntas para Continuar el Estudio en Familia:
+                      Preguntas Abiertas para Conclusiones Propias:
                     </span>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
-                      {report.synthesis.studyQuestionsForFamily.map((q, i) => (
+                    <ul className="space-y-2 text-xs text-slate-300">
+                      {report.sectionC_Identity.openQuestions.map((q, i) => (
                         <li key={i} className="flex items-start gap-2">
-                          <span className="text-amber-400 font-bold">{i + 1}.</span>
+                          <span className="text-amber-400 font-bold">•</span>
                           <span>{q}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  {/* Fuentes Verificables */}
-                  <div className="space-y-2 pt-2 border-t border-slate-800">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                      Fuentes y Referencias Verificables:
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {report.synthesis.verifiableSources.map((source, i) => (
-                        <div key={i} className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
-                          <p className="font-bold text-white">{source.title}</p>
-                          <p className="text-slate-400">{source.authorOrInstitution}</p>
-                        </div>
-                      ))}
+                  {/* Aviso Ético Obligatorio */}
+                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                    <strong>Aviso ético y metodológico:</strong> {report.sectionC_Identity.ethicalScopeNotice}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECCIÓN D: Emblema simbólico personal */}
+            {activeSection === 'D' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                  <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN D · EMBLEMA SIMBÓLICO PERSONAL</span>
+                  <h3 className="text-lg font-bold text-white font-serif">
+                    Propuesta de Emblema y Simbología Visual
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+                    <div className="md:col-span-7 space-y-3 text-xs text-slate-300 leading-relaxed">
+                      <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                        <span className="font-bold text-amber-300 block">Elemento Central:</span>
+                        <p>{report.sectionD_Emblem.centralElement}</p>
+                      </div>
+
+                      <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                        <span className="font-bold text-amber-300 block">Símbolos Complementarios:</span>
+                        <p>{report.sectionD_Emblem.complementarySymbols}</p>
+                      </div>
+
+                      <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                        <span className="font-bold text-amber-300 block">Colores y Asociaciones:</span>
+                        <p>{report.sectionD_Emblem.colorsAndAssociations}</p>
+                      </div>
+
+                      <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-1">
+                        <span className="font-bold text-amber-300 block">Lema Espiritual Propuesto:</span>
+                        <p className="font-serif italic text-white text-sm">«{customMotto || report.sectionD_Emblem.suggestedMotto}»</p>
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-5 flex flex-col items-center justify-center p-4 bg-[#f8f4ea] rounded-2xl border border-amber-900/20 shadow-inner">
+                      <div 
+                        className="w-full max-w-[210px] drop-shadow-md"
+                        dangerouslySetInnerHTML={{ __html: currentShieldSvg }}
+                      />
+                      <span className="text-[11px] text-slate-700 font-serif italic mt-2 text-center">
+                        «{customMotto || report.sectionD_Emblem.suggestedMotto}»
+                      </span>
                     </div>
                   </div>
+
+                  {/* Aviso Oficial No Removible */}
+                  <div className="p-3.5 bg-slate-900 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
+                    <strong>Declaración oficial de autenticidad:</strong> {report.sectionD_Emblem.disclaimerNotice}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECCIÓN E: Informe final (Ficha organizada con los 9 puntos requeridos) */}
+            {activeSection === 'E' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div>
+                      <span className="text-[10px] text-amber-400 font-bold uppercase tracking-widest block font-mono">SECCIÓN E · INFORME FINAL</span>
+                      <h3 className="text-lg font-bold text-white font-serif">
+                        Ficha Organizada de Identidad y Reflexión
+                      </h3>
+                    </div>
+                    <span className="text-xs bg-amber-500/15 text-amber-300 px-3 py-1 rounded-full border border-amber-500/30 font-semibold">
+                      9 Puntos Clave Integrados
+                    </span>
+                  </div>
+
+                  {/* 9 Puntos Requeridos organizados en tarjetas claras y legibles */}
+                  <div className="space-y-3">
+                    {/* Punto 1: Nombre completo analizado */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        1
+                      </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Nombre Completo Analizado</span>
+                        <p className="text-sm font-semibold text-white">{report.sectionE_Summary.item1_AnalyzedName}</p>
+                      </div>
+                    </div>
+
+                    {/* Punto 2: Origen lingüístico y significado documentado */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        2
+                      </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Origen Lingüístico y Significado Documentado</span>
+                        <p className="text-xs text-slate-300 leading-relaxed">{report.sectionE_Summary.item2_DocumentedOriginAndMeaning}</p>
+                      </div>
+                    </div>
+
+                    {/* Punto 3: Interpretación simbólica diferenciada */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        3
+                      </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Interpretación Simbólica (Diferenciada de la filología)</span>
+                        <p className="text-xs text-slate-300 leading-relaxed">{report.sectionE_Summary.item3_SymbolicInterpretation}</p>
+                      </div>
+                    </div>
+
+                    {/* Punto 4: Pasajes bíblicos y contexto */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        4
+                      </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Pasajes Bíblicos Exactos y Contexto Histórico-Literario</span>
+                        <p className="text-xs text-slate-300 leading-relaxed">{report.sectionE_Summary.item4_BiblicalPassagesAndContext}</p>
+                      </div>
+                    </div>
+
+                    {/* Punto 5: Reflexión pastoral de identidad */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        5
+                      </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Mensaje Pastoral y Devocional de Identidad</span>
+                        <p className="text-xs text-slate-300 leading-relaxed">{report.sectionE_Summary.item5_PersonalReflection}</p>
+                      </div>
+                    </div>
+
+                    {/* Punto 6: Preguntas de meditación personal */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        6
+                      </span>
+                      <div className="space-y-1.5 w-full">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Preguntas Abiertas de Meditación</span>
+                        <ul className="space-y-1 text-xs text-slate-300">
+                          {report.sectionE_Summary.item6_MeditationQuestions.map((q, i) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="text-amber-400 font-bold">•</span>
+                              <span>{q}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Punto 7: Oración opcional */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        7
+                      </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Oración de Consagración (Opcional)</span>
+                        <p className="text-xs text-slate-300 italic font-serif leading-relaxed">«{report.sectionE_Summary.item7_OptionalPrayer}»</p>
+                      </div>
+                    </div>
+
+                    {/* Punto 8: Propuesta de emblema y lema */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        8
+                      </span>
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Propuesta de Emblema Simbólico y Lema</span>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {report.sectionE_Summary.item8_EmblemProposal} • Lema: <span className="font-serif italic text-white">«{customMotto || report.sectionD_Emblem.suggestedMotto}»</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Punto 9: Fuentes consultables */}
+                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-start gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                        9
+                      </span>
+                      <div className="space-y-1.5 w-full">
+                        <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">Fuentes y Referencias Consultables</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                          {report.sectionE_Summary.item9_ConsultableSources.map((source, i) => (
+                            <div key={i} className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] text-slate-300">
+                              <p className="font-bold text-white">{source.title}</p>
+                              <p className="text-slate-400">{source.authorOrInstitution} • <span className="uppercase text-[10px] text-amber-400">{source.type}</span></p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contexto Familiar voluntario (si fue aportado) */}
+                  {report.familyContextSection && (
+                    <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2 text-xs text-slate-400">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Nota sobre Contexto Familiar Aportado:</span>
+                      <p className="italic">"{report.familyContextSection.providedContextText}"</p>
+                      <p className="text-[11px] text-amber-300/80">{report.familyContextSection.criticalNotice}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

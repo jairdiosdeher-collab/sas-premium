@@ -5,9 +5,9 @@
  */
 
 export type ReportDepth = 
-  | 'completa'              // Exploración completa: Etimología, Bíblico, Familiar, Emblema y Síntesis
+  | 'completa'              // Exploración completa: Etimología, Bíblico, Identidad, Emblema y Ficha
   | 'biblico'               // Enfoque bíblico: Etimología, Exégesis, Reflexión bíblica y Devocional
-  | 'etimologico_heraldico'; // Enfoque etimológico y heráldico: Origen filológico, Contexto familiar y Emblema
+  | 'etimologico_heraldico'; // Enfoque etimológico y heráldico: Origen filológico, Identidad y Emblema
 
 export type ChristianTradition =
   | 'interdenominacional'
@@ -33,60 +33,74 @@ export interface NameSearchRequest {
   tradition?: ChristianTradition;
 }
 
+// Apartado A: Mi nombre
 export interface SectionAPresentation {
   submittedFullName: string;
-  spellingVariants: string[];
-  scopeAndLimitsNotice: string; // Aclaración obligatoria sobre los límites de la interpretación
-}
-
-export interface SectionBEtymology {
-  nameAnalyzed: string;
   linguisticOrigin: string;
-  traditionalMeaning: string;
-  historicalVariants: string[];
+  documentedMeaning: string;
+  symbolicMeaning: string; // Interpretación simbólica, claramente diferenciada
+  knownVariants: string[];
   certaintyLevel: EtymologyCertainty;
   certaintyExplanation: string;
+  hasReliableInfo: boolean; // Indica cuando no exista información fiable suficiente
+  scopeAndLimitsNotice: string; // Aclaración obligatoria sobre los límites de la interpretación
   consultableSources: string[];
 }
 
-export interface SectionCBiblicalReflection {
+// Apartado B: Mi nombre y la Biblia
+export interface SectionBBiblicalReflection {
+  thematicRelation: string; // Relaciones temáticas entre el nombre y conceptos bíblicos
   hasBiblicalConnection: boolean;
   originalLanguageScript?: string; // Hebreo bíblico, arameo o griego koiné
   transliteration?: string;
   biblicalPassages: {
-    reference: string;
+    reference: string; // Libro, capítulo y versículo exacto
     passageText: string;
     literaryAndHistoricalContext: string;
   }[];
-  devotionalReflection: {
-    coreTheme: string;
-    narrative: string;
-    identityAndPurposeMessage: string;
-  };
+  pastoralReflection: string; // Reflexión pastoral respetuosa y personalizada
   reflectionQuestions: [string, string, string];
   optionalPrayer: string;
-  theologicalBoundaryNote: string;
+  theologicalBoundaryNote: string; // Aclara que coincidencia temática no demuestra origen bíblico
 }
 
+// Apartado C: Mi identidad y propósito
+export interface SectionCIdentity {
+  identityAndValues: string; // Identidad y valores fundamentales
+  strengthsAndService: string; // Fortalezas, vocación de servicio y mayordomía
+  openQuestions: [string, string, string]; // Preguntas abiertas para elaborar conclusiones propias
+  pastoralOrientation: string; // Orientación basada en esperanza, responsabilidad y respeto
+  ethicalScopeNotice: string; // No es profecía, revelación ni diagnóstico psicológico
+}
+
+// Contexto familiar aportado voluntariamente
 export interface SectionDFamilyContext {
   providedContextText: string;
-  criticalNotice: string; // "Esta información ha sido aportada por el usuario. No se deducen parentescos, ascendencia ni nobleza sin documentación probada."
+  criticalNotice: string; // "Información aportada por el usuario. No se deducen parentescos, ascendencia ni nobleza sin pruebas."
   researchAdvice: string[];
 }
 
-export interface SectionEEmblem {
-  conceptTheme: string; // Esperanza, Sabiduría, Servicio, Fe o Perseverancia
-  symbolsDescription: string;
-  colorPaletteExplanation: string;
-  suggestedMotto: string;
-  disclaimerNotice: string; // "Creación simbólica contemporánea. No es escudo heráldico histórico certificado ni prueba de linaje."
+// Apartado D: Emblema simbólico personal
+export interface SectionDEmblem {
+  centralElement: string; // Elemento central
+  complementarySymbols: string; // Símbolos complementarios
+  colorsAndAssociations: string; // Colores y sus posibles asociaciones
+  suggestedMotto: string; // Lema opcional
+  elementsExplanation: string; // Explicación de cada elemento
+  disclaimerNotice: string; // "Recurso creativo y reflexivo, no es escudo genealógico ni símbolo de autoridad."
 }
 
-export interface SectionFSynthesis {
-  summaryFindings: string;
-  spiritualReflection: string;
-  studyQuestionsForFamily: string[];
-  verifiableSources: {
+// Apartado E: Informe final (Ficha organizada 1-9)
+export interface SectionESummary {
+  item1_AnalyzedName: string;
+  item2_DocumentedOriginAndMeaning: string;
+  item3_SymbolicInterpretation: string;
+  item4_BiblicalPassagesAndContext: string;
+  item5_PersonalReflection: string;
+  item6_MeditationQuestions: string[];
+  item7_OptionalPrayer: string;
+  item8_EmblemProposal: string;
+  item9_ConsultableSources: {
     title: string;
     authorOrInstitution: string;
     type: 'biblica' | 'academica' | 'onomastica' | 'archivo_historico';
@@ -101,13 +115,13 @@ export interface CompleteNameReport {
   modelUsed?: string;
   request: NameSearchRequest;
 
-  // Las 6 secciones requeridas:
-  presentation: SectionAPresentation;        // A. Presentación del nombre
-  etymology: SectionBEtymology;              // B. Exploración etimológica
-  biblical: SectionCBiblicalReflection;      // C. Reflexión bíblica
-  family: SectionDFamilyContext;             // D. Reflexión familiar opcional
-  emblem: SectionEEmblem;                    // E. Emblema simbólico
-  synthesis: SectionFSynthesis;              // F. Síntesis final
+  // Apartados oficiales solicitados:
+  sectionA_Name: SectionAPresentation;
+  sectionB_Bible: SectionBBiblicalReflection;
+  sectionC_Identity: SectionCIdentity;
+  sectionD_Emblem: SectionDEmblem;
+  sectionE_Summary: SectionESummary;
+  familyContextSection?: SectionDFamilyContext;
 }
 
 export interface ShieldPalette {

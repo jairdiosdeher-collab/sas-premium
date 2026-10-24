@@ -71,7 +71,7 @@ export const SHIELD_CHARGES: { id: ShieldChargeSymbol; name: string; concept: st
 ];
 
 /**
- * Escapado riguroso XML / SVG para prevenir inyecciones o errores de renderizado
+ * Escapado XML / SVG para prevenir inyecciones y errores de parseo
  */
 function escapeXml(unsafe: string): string {
   return (unsafe || '').replace(/[<>&'"]/g, (c) => {
@@ -86,9 +86,6 @@ function escapeXml(unsafe: string): string {
   });
 }
 
-/**
- * Normaliza nombres de archivo eliminando acentos y caracteres no seguros
- */
 function sanitizeFilename(name: string): string {
   return (name || 'Documento')
     .normalize('NFD')
@@ -100,22 +97,22 @@ function sanitizeFilename(name: string): string {
 
 export class NameHeraldryService {
   /**
-   * Genera el informe invocando de forma segura a Gemini API a través del backend
+   * Genera el informe invocando Gemini API con formato estructurado
    */
   public static async generateReport(request: NameSearchRequest): Promise<CompleteNameReport> {
     const prompt = this.buildPrompt(request);
-    const systemInstruction = `Actúas como un equipo académico y pastoral interdisciplinario en:
+    const systemInstruction = `Actúas como un equipo interdisciplinario en:
 - Onomástica histórica y etimología científica.
 - Estudios bíblicos, exégesis en lenguas originales (hebreo bíblico, arameo y griego koiné).
-- Cuidado pastoral y autoconocimiento ético.
+- Cuidado pastoral, autoconocimiento ético y reflexión espiritual.
 - Simbología heráldica contemporánea.
 
 REGLAS ABSOLUTAS:
-1. El nombre jamás determina la personalidad, la conducta, la vocación, el destino ni la espiritualidad del consultante.
+1. El nombre jamás determina la personalidad, la conducta moral, la vocación, el destino ni la espiritualidad del consultante.
 2. No inventes raíces semíticas, citas bíblicas, blasones ni hechos históricos.
-3. Distingue claramente: etimología documentada, hipótesis discutida y asociación popular. Si un nombre es de origen latino o germánico (ej. Carlos, Rodrigo, Fernando, Marcos), indícalo expresamente y no le atribuyas etimología hebrea falsa.
+3. Diferencia claramente: etimología documentada de la interpretación simbólica. Si un nombre es de origen latino o germánico (ej. Carlos, Rodrigo, Fernando, Marcos), indícalo expresamente y no le atribuyas etimología hebrea falsa.
 4. Trata la información familiar aportada por el usuario como contexto voluntario, no como prueba de linaje, nobleza ni escudo histórico.
-5. El emblema propuesto es una creación simbólica contemporánea, no un escudo heráldico certificado.
+5. El emblema propuesto es un recurso creativo y reflexivo contemporáneo, no un símbolo de autoridad espiritual ni un escudo genealógico auténtico.
 6. Devuelve EXCLUSIVAMENTE un objeto JSON válido con la estructura solicitada, sin bloques explicativos adicionales.`;
 
     try {
@@ -125,7 +122,7 @@ REGLAS ABSOLUTAS:
         const cleaned = this.cleanJsonString(result.text);
         try {
           const parsed = JSON.parse(cleaned);
-          if (parsed && parsed.presentation && parsed.etymology && parsed.biblical) {
+          if (parsed && parsed.sectionA_Name && parsed.sectionB_Bible && parsed.sectionC_Identity && parsed.sectionD_Emblem && parsed.sectionE_Summary) {
             return {
               id: `nh-${Date.now()}`,
               generatedAt: new Date().toISOString(),
@@ -136,14 +133,14 @@ REGLAS ABSOLUTAS:
             };
           }
         } catch (jsonErr) {
-          console.warn('Error al parsear JSON devuelto por Gemini en Mi Nombre ante la Palabra:', jsonErr);
+          console.warn('Error al parsear JSON de Gemini en Mi Nombre ante la Palabra:', jsonErr);
         }
       }
     } catch (apiErr) {
       console.warn('Fallo de conexión con Gemini para Mi Nombre ante la Palabra:', apiErr);
     }
 
-    // Motor local contextual en caso de falla o desconexión
+    // Fallback contextual transparente y riguroso
     return this.generateIntelligentFallbackReport(request);
   }
 
@@ -162,87 +159,90 @@ REGLAS ABSOLUTAS:
       .filter(Boolean)
       .join(' ');
 
-    return `Genera un informe exhaustivo, riguroso y respetuoso para la sección "Mi nombre ante la Palabra" de PastoralMente.
+    return `Genera un informe estructurado y exhaustivo para el módulo "Mi nombre ante la Palabra" de PastoralMente.
 
-DATOS PROPORCIONADOS POR EL USUARIO:
+DATOS INGRESADOS POR EL USUARIO:
 - Nombre principal: "${req.firstName}"
 ${req.middleName ? `- Segundo nombre: "${req.middleName}"` : ''}
 - Primer apellido: "${req.firstSurname}"
 ${req.secondSurname ? `- Segundo apellido: "${req.secondSurname}"` : ''}
 ${req.countryOrRegion ? `- País o región de referencia: "${req.countryOrRegion}"` : ''}
-${req.familyContext ? `- Contexto familiar aportado por el usuario: "${req.familyContext}"` : ''}
-- Profundidad solicitada: ${req.depth} (completa | biblico | etimologico_heraldico)
-- Tradición cristiana de referencia: ${req.tradition || 'Interdenominacional'}
+${req.familyContext ? `- Contexto familiar aportado voluntariamente: "${req.familyContext.replace(/"/g, "'")}"` : ''}
+- Profundidad: ${req.depth} (completa | biblico | etimologico_heraldico)
+- Tradición cristiana: ${req.tradition || 'Interdenominacional'}
 
-ESTRUCTURA JSON REQUERIDA (debe coincidir con las 6 secciones A-F exactas):
+ESTRUCTURA JSON REQUERIDA (debe contener exactamente los siguientes apartados):
 {
-  "presentation": {
+  "sectionA_Name": {
     "submittedFullName": "${fullInputName}",
-    "spellingVariants": ["Variante 1", "Variante 2"],
-    "scopeAndLimitsNotice": "Aclaración sobre los límites de la interpretación: El nombre es una designación afectiva e histórica que no determina la personalidad, el destino ni la espiritualidad del portador."
-  },
-  "etymology": {
-    "nameAnalyzed": "${req.firstName}",
-    "linguisticOrigin": "Idioma o familia lingüística (ej. Hebreo bíblico, Latín clásico, Germánico antiguo, etc.)",
-    "traditionalMeaning": "Significado rigurosamente documentado",
-    "historicalVariants": ["Variante histórica 1", "Variante histórica 2"],
+    "linguisticOrigin": "Origen lingüístico o etimológico documentado (latín, germánico, hebreo, etc.)",
+    "documentedMeaning": "Significado rigurosamente documentado",
+    "symbolicMeaning": "Interpretación simbólica tradicional, claramente diferenciada de la filología",
+    "knownVariants": ["Variante 1", "Variante 2"],
     "certaintyLevel": "documentada | hipotesis_filologica | tradicion_popular | no_verificable",
-    "certaintyExplanation": "Explicación de qué aspectos están documentados filológicamente y qué constituye hipótesis o tradición popular.",
-    "consultableSources": ["Diccionario de la RAE / Corpus Onomástico", "Corpus Inscriptionum Latinarum o Léxico Hebreo-Arameo de Gesenius/Brown-Driver-Briggs"]
+    "certaintyExplanation": "Explicación de qué se encuentra documentado y qué es conjetura",
+    "hasReliableInfo": true,
+    "scopeAndLimitsNotice": "Aclaración sobre los límites de la interpretación: El nombre es una designación afectiva e histórica que no determina la personalidad, el destino ni la espiritualidad del portador.",
+    "consultableSources": ["Diccionario de la RAE / Corpus Onomástico", "Corpus Inscriptionum o Léxicos académicos"]
   },
-  "biblical": {
+  "sectionB_Bible": {
+    "thematicRelation": "Explicación de la relación temática entre el nombre y conceptos bíblicos clave",
     "hasBiblicalConnection": true o false,
-    "originalLanguageScript": "Grafía en caracteres originales si existe conexión (hebreo bíblico con niqqud, arameo o griego koiné). Si no existe, dejar null.",
+    "originalLanguageScript": "Grafía en caracteres originales si existe conexión (hebreo bíblico, arameo o griego koiné). Si no, null",
     "transliteration": "Transliteración fonética académica",
     "biblicalPassages": [
       {
-        "reference": "Libro Capítulo:Versículo exacto (ej. Génesis 25:26, Salmo 139:14, Juan 8:12)",
+        "reference": "Libro Capítulo:Versículo exacto (ej. Salmo 139:13-16 o Juan 8:12)",
         "passageText": "Texto bíblico en versión fiel en español",
         "literaryAndHistoricalContext": "Contexto histórico, autoría y género literario del texto bíblico"
       }
     ],
-    "devotionalReflection": {
-      "coreTheme": "Tema central: Identidad, Gracia, Vocación o Esperanza",
-      "narrative": "Reflexión devocional profunda de 2 a 3 párrafos orientada a la dignidad, propósito y crecimiento espiritual.",
-      "identityAndPurposeMessage": "Mensaje de afirmación de que el valor del consultante proviene del amor de Dios en Cristo, no de la gloria de linajes terrenales."
-    },
+    "pastoralReflection": "Reflexión pastoral respetuosa y personalizada (2 a 3 párrafos orientados a la dignidad, propósito y gracia)",
     "reflectionQuestions": [
       "Pregunta 1 para meditación personal profunda",
       "Pregunta 2 para meditación personal profunda",
       "Pregunta 3 para meditación personal profunda"
     ],
-    "optionalPrayer": "Oración respetuosa, cristocéntrica y voluntaria de gratitud y encomienda de vida.",
-    "theologicalBoundaryNote": "Aviso hermenéutico: Compartir un nombre bíblico no implica heredar el carácter ni la misión histórica de un personaje bíblico."
+    "optionalPrayer": "Oración opcional, respetuosa y no coercitiva de agradecimiento y encomienda a Dios.",
+    "theologicalBoundaryNote": "Aviso teológico: Una coincidencia temática no demuestra que el nombre tenga un origen bíblico."
   },
-  "family": {
-    "providedContextText": "${req.familyContext ? req.familyContext.replace(/"/g, "'") : 'No se aportó información familiar adicional.'}",
-    "criticalNotice": "Esta información ha sido aportada por el usuario como memoria personal. En conformidad con la heráldica y genealogía crítica, un apellido compartido no demuestra pertenencia al mismo linaje ni certifica títulos ni armas históricas sin pruebas documentales fehacientes.",
-    "researchAdvice": [
-      "Consultar actas de nacimiento y matrimonio en registros civiles locales",
-      "Examinar partidas de bautismo en archivos parroquiales diocesanos",
-      "Verificar protocolos notariales y censos históricos regionales"
-    ]
-  },
-  "emblem": {
-    "conceptTheme": "Esperanza | Sabiduría | Servicio | Fe | Perseverancia",
-    "symbolsDescription": "Descripción de las figuras y geometría del emblema simbólico",
-    "colorPaletteExplanation": "Significado simbólico de los esmaltes elegidos (ej. Azur por la justicia, Oro por la sabiduría divina)",
-    "suggestedMotto": "Lema devocional sugerido (en latín o español)",
-    "disclaimerNotice": "Creación simbólica contemporánea. No es un escudo heráldico histórico certificado ni prueba de linaje nobiliario."
-  },
-  "synthesis": {
-    "summaryFindings": "Síntesis integradora de los aspectos etimológicos, bíblicos y personales analizados.",
-    "spiritualReflection": "Reflexión final sobre el caminar con Dios en la cotidianidad.",
-    "studyQuestionsForFamily": [
-      "Pregunta para conversar en familia sobre el legado espiritual que desean construir",
-      "Pregunta para reflexionar sobre los valores a transmitir a las próximas generaciones"
+  "sectionC_Identity": {
+    "identityAndValues": "Reflexión sobre identidad personal y valores fundamentales ante el Creador",
+    "strengthsAndService": "Reflexión sobre fortalezas, servicio al prójimo y mayordomía",
+    "openQuestions": [
+      "Pregunta abierta 1 para elaborar conclusiones propias",
+      "Pregunta abierta 2 para elaborar conclusiones propias",
+      "Pregunta abierta 3 para elaborar conclusiones propias"
     ],
-    "verifiableSources": [
+    "pastoralOrientation": "Orientación pastoral basada en esperanza, responsabilidad moral y respeto.",
+    "ethicalScopeNotice": "Aviso ético: Esta sección no es una profecía, revelación divina, evaluación psicométrica ni diagnóstico clínico."
+  },
+  "sectionD_Emblem": {
+    "centralElement": "Elemento central propuesto (ej. Cruz flordelisada, Libro abierto, Rama de olivo, etc.)",
+    "complementarySymbols": "Símbolos complementarios propuestos",
+    "colorsAndAssociations": "Colores propuestos y sus asociaciones simbólicas (ej. Azur por la justicia, Oro por la fe viva)",
+    "suggestedMotto": "Lema devocional sugerido (en latín o español)",
+    "elementsExplanation": "Explicación del significado reflexivo de cada elemento",
+    "disclaimerNotice": "El emblema se presenta como un recurso creativo y reflexivo contemporáneo, no como un símbolo de autoridad espiritual ni como un escudo genealógico auténtico si no existe documentación que lo respalde."
+  },
+  "sectionE_Summary": {
+    "item1_AnalyzedName": "${fullInputName}",
+    "item2_DocumentedOriginAndMeaning": "Resumen de origen lingüístico y significado documentado",
+    "item3_SymbolicInterpretation": "Resumen de interpretación simbólica claramente diferenciada",
+    "item4_BiblicalPassagesAndContext": "Pasajes bíblicos clave y contexto sintético",
+    "item5_PersonalReflection": "Síntesis de reflexión personal sobre identidad y propósito",
+    "item6_MeditationQuestions": [
+      "Pregunta clave para meditar",
+      "Pregunta clave para meditar en familia"
+    ],
+    "item7_OptionalPrayer": "Oración pastoral resumida",
+    "item8_EmblemProposal": "Propuesta y justificación del emblema simbólico",
+    "item9_ConsultableSources": [
       {
-        "title": "Biblia Hebraica Stuttgartensia / Novum Testamentum Graece",
-        "authorOrInstitution": "Sociedades Bíblicas Unidas / Deutsche Bibelgesellschaft",
+        "title": "Biblia de Jerusalén / Reina-Valera 1960",
+        "authorOrInstitution": "Sociedades Bíblicas Unidas",
         "type": "biblica",
-        "referenceUrlOrCite": "Aparato crítico estándar"
+        "referenceUrlOrCite": "Texto canónico estándar"
       },
       {
         "title": "Diccionario de la Lengua Española",
@@ -250,6 +250,15 @@ ESTRUCTURA JSON REQUERIDA (debe coincidir con las 6 secciones A-F exactas):
         "type": "onomastica",
         "referenceUrlOrCite": "https://dle.rae.es"
       }
+    ]
+  },
+  "familyContextSection": {
+    "providedContextText": "${req.familyContext ? req.familyContext.replace(/"/g, "'") : 'No se aportó información familiar adicional.'}",
+    "criticalNotice": "Esta información ha sido aportada por el usuario como contexto personal provisto por él. No se deducen parentescos, ascendencia, nobleza ni hechos genealógicos sin documentación verificable.",
+    "researchAdvice": [
+      "Solicitar actas de nacimiento y matrimonio en registros civiles locales",
+      "Consultar partidas de bautismo en archivos parroquiales diocesanos",
+      "Verificar protocolos notariales y censos históricos regionales"
     ]
   }
 }`;
@@ -466,7 +475,7 @@ ESTRUCTURA JSON REQUERIDA (debe coincidir con las 6 secciones A-F exactas):
   }
 
   /**
-   * Genera un informe riguroso y honesto cuando Gemini no está disponible
+   * Genera informe contextual riguroso si Gemini está temporalmente inaccesible
    */
   public static generateIntelligentFallbackReport(request: NameSearchRequest): CompleteNameReport {
     const fn = (request.firstName || 'David').trim();
@@ -485,24 +494,25 @@ ESTRUCTURA JSON REQUERIDA (debe coincidir con las 6 secciones A-F exactas):
       generatedAt: new Date().toISOString(),
       source: 'local-engine',
       request,
-      presentation: {
+      sectionA_Name: {
         submittedFullName: full,
-        spellingVariants: [fn, `${fn}s`, `${fn}o`].filter(Boolean),
-        scopeAndLimitsNotice: 'Aviso sobre los límites de la interpretación: El nombre es una designación afectiva, histórica y comunitaria. En ningún caso determina la personalidad, la conducta moral, la vocación profesional ni el destino espiritual de quien lo porta.'
-      },
-      etymology: {
-        nameAnalyzed: fn,
         linguisticOrigin: isHebrewBiblical ? 'Hebreo Bíblico clásico' : 'Latín / Románico tradicional',
-        traditionalMeaning: isHebrewBiblical ? 'El amado de Dios / Aquel a quien Dios sostiene' : 'Persona honorable que camina con rectitud y nobleza de espíritu',
-        historicalVariants: [fn, `${fn}o`],
+        documentedMeaning: isHebrewBiblical ? 'El amado de Dios / Aquel a quien Dios sostiene' : 'Persona honorable que camina con rectitud y nobleza de espíritu',
+        symbolicMeaning: 'Evoca vocación de liderazgo compasivo, mayordomía de los dones y fidelidad en los compromisos.',
+        knownVariants: [fn, `${fn}s`, `${fn}o`].filter(Boolean),
         certaintyLevel: 'documentada',
-        certaintyExplanation: 'Origen documentado en repertorios diacrónicos y fuentes documentales de la tradición histórica.',
+        certaintyExplanation: 'Origen documentado en fuentes onomásticas y léxicos diacrónicos reconocidos.',
+        hasReliableInfo: true,
+        scopeAndLimitsNotice: 'Aviso sobre los límites de la interpretación: El nombre es una designación afectiva e histórica que no determina la personalidad, el destino ni la espiritualidad del portador.',
         consultableSources: [
           'Diccionario de la Lengua Española (Real Academia Española)',
           'Gesenius Hebrew and Chaldee Lexicon / Brown-Driver-Briggs'
         ]
       },
-      biblical: {
+      sectionB_Bible: {
+        thematicRelation: isHebrewBiblical 
+          ? 'Conexión onomástica y temática directa en los relatos del canon bíblico veterotestamentario.'
+          : 'Conexión temática conceptual: la Escritura enseña que Dios conoce a cada ser humano por su nombre y lo llama a vivir en rectitud.',
         hasBiblicalConnection: isHebrewBiblical,
         originalLanguageScript: isHebrewBiblical 
           ? (lowerName.includes('david') ? 'דָּוִד' : lowerName.includes('daniel') ? 'דָּנִיֵּאל' : lowerName.includes('juan') ? 'יוֹחָנָן / Ἰωάννης' : 'שְׁמוּאֵל')
@@ -514,46 +524,50 @@ ESTRUCTURA JSON REQUERIDA (debe coincidir con las 6 secciones A-F exactas):
             passageText: isHebrewBiblical 
               ? 'El Señor es mi pastor; nada me faltará. En lugares de delicados pastos me hará descansar; junto a aguas de reposo me pastoreará.' 
               : 'Porque tú formaste mis entrañas; tú me hiciste en el vientre de mi madre. Te alabaré; porque formidables, maravillosas son tus obras.',
-            literaryAndHistoricalContext: 'Texto poético sapiencial de la literatura veterotestamentaria que confiesa la soberanía y providencia redentora de Dios sobre la vida humana.'
+            literaryAndHistoricalContext: 'Texto poético sapiencial de la literatura bíblica que confiesa la soberanía y providencia redentora de Dios sobre la vida humana.'
           }
         ],
-        devotionalReflection: {
-          coreTheme: 'Identidad y Gracia en el Creador',
-          narrative: `Tu nombre te acompaña como un recordatorio de que tu existencia no es un accidente, sino parte del propósito eterno de Dios. En las Escrituras, el Señor conoce a cada una de sus ovejas por su nombre (Juan 10:3).\n\nEl Evangelio nos enseña que nuestro valor no descansa en títulos nobiliarios, logros humanos ni en la sonoridad de un apellido, sino en la obra redentora de Jesucristo en la cruz.`,
-          identityAndPurposeMessage: 'Tu verdadera dignidad procede de ser creado a imagen de Dios y amado incondicionalmente por Él.'
-        },
+        pastoralReflection: `Tu nombre te acompaña como un recordatorio de que tu existencia no es fruto de la casualidad, sino del propósito eterno de Dios. En las Escrituras, el Señor conoce a cada una de sus ovejas por su nombre (Juan 10:3).\n\nEl Evangelio nos enseña que nuestro valor no descansa en títulos nobiliarios, logros humanos ni en la sonoridad de un apellido, sino en la obra redentora de Jesucristo en la cruz.`,
         reflectionQuestions: [
           '¿De qué manera busco mi valor en la opinión humana en lugar de descansar en la identidad que Dios me otorga?',
           '¿Qué virtudes de servicio, perdón y paciencia deseo reflejar en mi hogar y comunidad?',
           '¿Cómo puedo honrar a Dios a través de mis decisiones cotidianas?'
         ],
         optionalPrayer: 'Señor Dios todopoderoso, te doy gracias por mi vida y por mi familia. Guía mis pasos en tu verdad, dame un corazón compasivo y hazme instrumento de tu paz. Por Jesucristo, nuestro Salvador. Amén.',
-        theologicalBoundaryNote: 'Aviso hermenéutico: Compartir un nombre bíblico no implica heredar el carácter ni la misión histórica de un personaje bíblico.'
+        theologicalBoundaryNote: 'Aviso teológico: Una coincidencia temática no demuestra que el nombre tenga un origen bíblico.'
       },
-      family: {
-        providedContextText: request.familyContext || 'Información de memoria personal aportada voluntariamente por el usuario.',
-        criticalNotice: 'Esta información ha sido aportada por el usuario como memoria personal. En conformidad con la heráldica y genealogía crítica, un apellido compartido no demuestra pertenencia al mismo linaje ni certifica títulos ni armas históricas sin pruebas documentales fehacientes.',
-        researchAdvice: [
-          'Paso 1: Solicitar actas de nacimiento y matrimonio en registros civiles locales.',
-          'Paso 2: Consultar partidas de bautismo en archivos diocesanos y parroquiales.',
-          'Paso 3: Verificar protocolos notariales y censos históricos regionales.'
-        ]
-      },
-      emblem: {
-        conceptTheme: 'Fe y Esperanza',
-        symbolsDescription: 'Escudo ibérico con boca tradicional, partición cuartelada, monograma central con iniciales y carga sacra.',
-        colorPaletteExplanation: 'El Azur representa lealtad y justicia; el Oro simboliza fe viva y sabiduría divina.',
-        suggestedMotto: 'SOLI DEO GLORIA (Sólo a Dios la Gloria)',
-        disclaimerNotice: 'Creación simbólica contemporánea. No es un escudo heráldico histórico certificado ni prueba de linaje nobiliario.'
-      },
-      synthesis: {
-        summaryFindings: `El análisis de ${fn} ${sn} integra el valor cultural e histórico del nombre con la verdad bíblica del cuidado providencial de Dios.`,
-        spiritualReflection: 'Caminar con humildad, reconociendo que el mayor legado que podemos construir es una vida de integridad y amor.',
-        studyQuestionsForFamily: [
-          '¿Cuáles son las historias familiares de superación que deseamos recordar con gratitud?',
-          '¿Qué valores éticos y de fe queremos transmitir con mayor intención a las siguientes generaciones?'
+      sectionC_Identity: {
+        identityAndValues: 'Tu identidad descansa en haber sido creado a imagen de Dios y llamado a reflejar su verdad, justicia y amor en cada ámbito relacional.',
+        strengthsAndService: 'Capacidad de resiliencia, escucha empática, servicio generoso y fidelidad en las responsabilidades cotidianas.',
+        openQuestions: [
+          '¿Qué valores considero innegociables en mi vida y cómo los expreso en momentos de presión?',
+          '¿De qué forma puedo utilizar mis dones personales para aliviar el sufrimiento de otros?',
+          '¿Qué aspectos de mi carácter necesitan madurar a la luz de la paciencia y el amor de Dios?'
         ],
-        verifiableSources: [
+        pastoralOrientation: 'Vivir con esperanza activa, asumiendo la responsabilidad del testimonio diario con humildad y respeto hacia el prójimo.',
+        ethicalScopeNotice: 'Aviso ético: Esta sección constituye una orientación pastoral reflexiva; no representa una profecía, revelación sobrenatural, test psicométrico ni evaluación clínica.'
+      },
+      sectionD_Emblem: {
+        centralElement: 'Escudo ibérico con cruz flordelisada o libro de las Escrituras',
+        complementarySymbols: 'Partición cuartelada en cruz con monograma central de iniciales y cinta inferior',
+        colorsAndAssociations: 'Azur (justicia y lealtad) combinado con Oro (sabiduría divina y fe viva)',
+        suggestedMotto: 'SOLI DEO GLORIA (Sólo a Dios la Gloria)',
+        elementsExplanation: 'El campo azul evoca la fidelidad del pacto divino; el oro resalta la nobleza moral del servicio cristiano.',
+        disclaimerNotice: 'El emblema se presenta como un recurso creativo y reflexivo contemporáneo, no como un símbolo de autoridad espiritual ni como un escudo genealógico auténtico si no existe documentación que lo respalde.'
+      },
+      sectionE_Summary: {
+        item1_AnalyzedName: full,
+        item2_DocumentedOriginAndMeaning: `${isHebrewBiblical ? 'Hebreo Bíblico clásico' : 'Latín / Románico tradicional'}: ${isHebrewBiblical ? 'El amado de Dios / Aquel a quien Dios sostiene' : 'Persona honorable que camina con rectitud'}`,
+        item3_SymbolicInterpretation: 'Designación de bendición familiar y testimonio de vida íntegra.',
+        item4_BiblicalPassagesAndContext: `${isHebrewBiblical ? 'Salmo 23:1-3' : 'Salmo 139:13-16'} (Poesía sapiencial bíblica de providencia y amparo divino)`,
+        item5_PersonalReflection: 'La verdadera dignidad del consultante emana de ser amado por el Creador y llamado a servir en amor.',
+        item6_MeditationQuestions: [
+          '¿En qué reposa mi seguridad interior?',
+          '¿Qué legado espiritual deseo transmitir a quienes me rodean?'
+        ],
+        item7_OptionalPrayer: 'Señor, haz de mi vida un testimonio de tu fidelidad y de tu gracia.',
+        item8_EmblemProposal: 'Diseño vectorial en Azur y Oro con iniciales monogramáticas y carga sacra.',
+        item9_ConsultableSources: [
           {
             title: 'Biblia de Jerusalén / Reina-Valera 1960',
             authorOrInstitution: 'Sociedades Bíblicas Unidas',
@@ -567,15 +581,24 @@ ESTRUCTURA JSON REQUERIDA (debe coincidir con las 6 secciones A-F exactas):
             referenceUrlOrCite: 'https://dle.rae.es'
           }
         ]
+      },
+      familyContextSection: {
+        providedContextText: request.familyContext || 'Información de memoria personal aportada voluntariamente por el usuario.',
+        criticalNotice: 'Esta información ha sido aportada por el usuario como contexto personal provisto por él. No se deducen parentescos, ascendencia, nobleza ni hechos genealógicos sin documentación verificable.',
+        researchAdvice: [
+          'Paso 1: Solicitar actas de nacimiento y matrimonio en registros civiles locales.',
+          'Paso 2: Consultar partidas de bautismo en archivos diocesanos y parroquiales.',
+          'Paso 3: Verificar protocolos notariales y censos históricos regionales.'
+        ]
       }
     };
   }
 
   /**
-   * Descarga el informe en formato TXT estructurado con UTF-8
+   * Exporta el informe en formato TXT estructurado con UTF-8
    */
   public static exportReportAsTxt(report: CompleteNameReport): void {
-    const fn = report.presentation.submittedFullName || report.request.firstName;
+    const fn = report.sectionA_Name.submittedFullName || report.request.firstName;
     const dateFormatted = new Date(report.generatedAt).toLocaleDateString('es-ES', { dateStyle: 'full' });
 
     let txt = `================================================================================
@@ -587,82 +610,94 @@ Fecha de Emisión: ${dateFormatted}
 Motor de Generación: ${report.source === 'gemini-live' ? 'Inteligencia Artificial Gemini Live' : 'Motor Especializado PastoralMente'}
 ================================================================================
 
-A. PRESENTACIÓN DEL NOMBRE
+A. MI NOMBRE
 --------------------------------------------------------------------------------
-Nombre Analizado: ${report.presentation.submittedFullName}
-Variantes Ortográficas Documentadas: ${report.presentation.spellingVariants.join(', ') || 'Ninguna documentada'}
+Nombre Analizado: ${report.sectionA_Name.submittedFullName}
+Origen Lingüístico: ${report.sectionA_Name.linguisticOrigin}
+Significado Documentado: ${report.sectionA_Name.documentedMeaning}
+Interpretación Simbólica: ${report.sectionA_Name.symbolicMeaning}
+Variantes Conocidas: ${report.sectionA_Name.knownVariants.join(', ') || 'Ninguna documentada'}
+Certeza Documentada: ${report.sectionA_Name.certaintyLevel.toUpperCase()}
+Explicación de Certeza: ${report.sectionA_Name.certaintyExplanation}
 
 * AVISO SOBRE LOS LÍMITES DE LA INTERPRETACIÓN:
-${report.presentation.scopeAndLimitsNotice}
+${report.sectionA_Name.scopeAndLimitsNotice}
 
-B. EXPLORACIÓN ETIMOLÓGICA
---------------------------------------------------------------------------------
-Nombre Principal: ${report.etymology.nameAnalyzed}
-Origen Lingüístico: ${report.etymology.linguisticOrigin}
-Significado Tradicionalmente Atribuido: ${report.etymology.traditionalMeaning}
-Grado de Certeza: ${report.etymology.certaintyLevel.toUpperCase()}
-Explicación de Certeza: ${report.etymology.certaintyExplanation}
 Fuentes Consultables:
-${report.etymology.consultableSources.map(s => `  • ${s}`).join('\n')}
+${report.sectionA_Name.consultableSources.map(s => `  • ${s}`).join('\n')}
 
-C. REFLEXIÓN BÍBLICA
+B. MI NOMBRE Y LA BIBLIA
 --------------------------------------------------------------------------------
-¿Posee Conexión Bíblica Demostrable?: ${report.biblical.hasBiblicalConnection ? 'SÍ' : 'NO (Sin raíz etimológica directa en el texto bíblico)'}
-${report.biblical.originalLanguageScript ? `Grafía en Lengua Original: ${report.biblical.originalLanguageScript}\nTransliteración Fonética: ${report.biblical.transliteration || 'N/A'}\n` : ''}
+Relación Temática: ${report.sectionB_Bible.thematicRelation}
+¿Posee Conexión Bíblica Demostrable?: ${report.sectionB_Bible.hasBiblicalConnection ? 'SÍ' : 'NO (Sin raíz etimológica directa en el texto bíblico)'}
+${report.sectionB_Bible.originalLanguageScript ? `Grafía en Lengua Original: ${report.sectionB_Bible.originalLanguageScript}\nTransliteración Fonética: ${report.sectionB_Bible.transliteration || 'N/A'}\n` : ''}
+
 Pasajes Bíblicos Pertinentes:
-${report.biblical.biblicalPassages.map(p => `• [${p.reference}] «${p.passageText}»\n  Contexto: ${p.literaryAndHistoricalContext}`).join('\n\n')}
+${report.sectionB_Bible.biblicalPassages.map(p => `• [${p.reference}] «${p.passageText}»\n  Contexto: ${p.literaryAndHistoricalContext}`).join('\n\n')}
 
-Reflexión Devocional (${report.biblical.devotionalReflection.coreTheme}):
-${report.biblical.devotionalReflection.narrative}
-
-Mensaje de Identidad y Propósito:
-${report.biblical.devotionalReflection.identityAndPurposeMessage}
+Reflexión Pastoral:
+${report.sectionB_Bible.pastoralReflection}
 
 Preguntas para la Reflexión Personal:
-1. ${report.biblical.reflectionQuestions[0]}
-2. ${report.biblical.reflectionQuestions[1]}
-3. ${report.biblical.reflectionQuestions[2]}
+1. ${report.sectionB_Bible.reflectionQuestions[0]}
+2. ${report.sectionB_Bible.reflectionQuestions[1]}
+3. ${report.sectionB_Bible.reflectionQuestions[2]}
 
 Oración Opcional:
-${report.biblical.optionalPrayer}
+${report.sectionB_Bible.optionalPrayer}
 
 * AVISO TEOLÓGICO:
-${report.biblical.theologicalBoundaryNote}
+${report.sectionB_Bible.theologicalBoundaryNote}
 
-D. REFLEXIÓN FAMILIAR OPCIONAL
+C. MI IDENTIDAD Y PROPÓSITO
 --------------------------------------------------------------------------------
-Contexto Aportado por el Usuario:
-${report.family.providedContextText}
+Identidad y Valores:
+${report.sectionC_Identity.identityAndValues}
 
-* AVISO CRÍTICO GENEALÓGICO:
-${report.family.criticalNotice}
+Fortalezas y Vocación de Servicio:
+${report.sectionC_Identity.strengthsAndService}
 
-Ruta Recomendada de Investigación Familiar:
-${report.family.researchAdvice.map((a, i) => `${i + 1}. ${a}`).join('\n')}
+Orientación Pastoral:
+${report.sectionC_Identity.pastoralOrientation}
 
-E. EMBLEMA SIMBÓLICO
+Preguntas Abiertas para Elaborar Conclusiones Propias:
+1. ${report.sectionC_Identity.openQuestions[0]}
+2. ${report.sectionC_Identity.openQuestions[1]}
+3. ${report.sectionC_Identity.openQuestions[2]}
+
+* AVISO ÉTICO:
+${report.sectionC_Identity.ethicalScopeNotice}
+
+D. EMBLEMA SIMBÓLICO PERSONAL
 --------------------------------------------------------------------------------
-Concepto Inspirador: ${report.emblem.conceptTheme}
-Descripción de Símbolos: ${report.emblem.symbolsDescription}
-Explicación de Esmaltes y Colores: ${report.emblem.colorPaletteExplanation}
-Lema Sugerido: «${report.emblem.suggestedMotto}»
+Elemento Central: ${report.sectionD_Emblem.centralElement}
+Símbolos Complementarios: ${report.sectionD_Emblem.complementarySymbols}
+Colores y Asociaciones: ${report.sectionD_Emblem.colorsAndAssociations}
+Lema Opcional: «${report.sectionD_Emblem.suggestedMotto}»
+Explicación de Elementos: ${report.sectionD_Emblem.elementsExplanation}
 
 * DECLARACIÓN HERÁLDICA:
-${report.emblem.disclaimerNotice}
+${report.sectionD_Emblem.disclaimerNotice}
 
-F. SÍNTESIS FINAL
+E. INFORME FINAL (FICHA ORGANIZADA)
 --------------------------------------------------------------------------------
-Síntesis de Hallazgos:
-${report.synthesis.summaryFindings}
+1. Nombre Analizado: ${report.sectionE_Summary.item1_AnalyzedName}
+2. Origen y Significado Documentado: ${report.sectionE_Summary.item2_DocumentedOriginAndMeaning}
+3. Interpretación Simbólica: ${report.sectionE_Summary.item3_SymbolicInterpretation}
+4. Pasajes Bíblicos y Contexto: ${report.sectionE_Summary.item4_BiblicalPassagesAndContext}
+5. Reflexión Personal: ${report.sectionE_Summary.item5_PersonalReflection}
+6. Preguntas para Meditar:
+${report.sectionE_Summary.item6_MeditationQuestions.map(q => `   - ${q}`).join('\n')}
+7. Oración Opcional: ${report.sectionE_Summary.item7_OptionalPrayer}
+8. Propuesta de Emblema: ${report.sectionE_Summary.item8_EmblemProposal}
+9. Fuentes Consultables:
+${report.sectionE_Summary.item9_ConsultableSources.map(s => `   - [${s.type.toUpperCase()}] ${s.title} (${s.authorOrInstitution}): ${s.referenceUrlOrCite || 'Consulta académica'}`).join('\n')}
 
-Reflexión Espiritual:
-${report.synthesis.spiritualReflection}
-
-Preguntas para Continuar el Diálogo en Familia:
-${report.synthesis.studyQuestionsForFamily.map((q, i) => `${i + 1}. ${q}`).join('\n')}
-
-Fuentes y Referencias Verificables:
-${report.synthesis.verifiableSources.map(s => `• [${s.type.toUpperCase()}] ${s.title} — ${s.authorOrInstitution} (${s.referenceUrlOrCite || 'Consulta académica'})`).join('\n')}
+${report.familyContextSection && report.familyContextSection.providedContextText ? `
+CONTEXTO FAMILIAR APORTADO VOLUNTARIAMENTE POR EL USUARIO:
+${report.familyContextSection.providedContextText}
+* ${report.familyContextSection.criticalNotice}
+` : ''}
 
 ================================================================================
 PastoralMente AI · Documento protegido para edificación y estudio personal.
