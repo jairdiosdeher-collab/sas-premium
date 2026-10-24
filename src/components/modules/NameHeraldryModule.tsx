@@ -215,6 +215,25 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
     }
   };
 
+  const handlePrintReport = async () => {
+    try {
+      // Esperar a que la ilustración generada termine de cargar antes de abrir el diálogo de impresión.
+      const printImages = Array.from(document.querySelectorAll<HTMLImageElement>('.heraldry-print-report img'));
+      await Promise.all(printImages.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          const finish = () => resolve();
+          img.addEventListener('load', finish, { once: true });
+          img.addEventListener('error', finish, { once: true });
+          window.setTimeout(finish, 5000);
+        });
+      }));
+    } catch (error) {
+      console.warn('No fue posible esperar todas las imágenes antes de imprimir:', error);
+    }
+    window.print();
+  };
+
   const handleGenerateShieldImage = async () => {
     if (!firstName.trim() || !firstSurname.trim()) {
       setErrorMessage('Ingresa tu nombre y primer apellido antes de generar la ilustración.');
@@ -848,7 +867,7 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
               {/* Botón: Imprimir / PDF */}
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={handlePrintReport}
                 className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
