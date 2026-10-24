@@ -50,6 +50,7 @@ app.get('/api/gemini/status', (_req, res) => {
 app.post('/api/gemini/generate', async (req, res) => {
   try {
     const { prompt, systemInstruction, responseMimeType } = req.body;
+    const enableWebSearch = req.body.enableWebSearch === true;
 
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({
@@ -73,11 +74,13 @@ app.post('/api/gemini/generate', async (req, res) => {
     }
 
     let responseText = '';
+    let groundingSources: Array<{ title: string; url: string }> = [];
     let modelUsed = 'gemini-3.8-flash';
 
     const config: any = {};
     if (systemInstruction) config.systemInstruction = systemInstruction;
     if (responseMimeType) config.responseMimeType = responseMimeType;
+    if (enableWebSearch) config.tools = [{ googleSearch: {} }];
 
     try {
       const response = await ai.models.generateContent({
@@ -86,6 +89,7 @@ app.post('/api/gemini/generate', async (req, res) => {
         config: Object.keys(config).length > 0 ? config : undefined,
       });
       responseText = response.text || '';
+      groundingSources = extractGroundingSources(response);
     } catch (primaryErr: any) {
       console.warn('Aviso: gemini-3.8-flash no respondió, intentando con gemini-3.1-flash-lite:', primaryErr?.message || primaryErr);
       modelUsed = 'gemini-3.1-flash-lite';
@@ -95,6 +99,7 @@ app.post('/api/gemini/generate', async (req, res) => {
         config: Object.keys(config).length > 0 ? config : undefined,
       });
       responseText = fallbackResponse.text || '';
+      groundingSources = extractGroundingSources(fallbackResponse);
     }
 
     if (!responseText.trim()) {
@@ -112,6 +117,8 @@ app.post('/api/gemini/generate', async (req, res) => {
       success: true,
       text: responseText,
       modelUsed,
+      groundingSources,
+      webSearchRequested: enableWebSearch,
     });
   } catch (error: any) {
     const errorMessage = error?.message || String(error);
@@ -144,6 +151,19 @@ app.post('/api/stripe/create-checkout', async (req, res) => {
     });
   }
 });
+
+function extractGroundingSources(response: any): Array<{ title: string; url: string }> {
+  const chunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  if (!Array.isArray(chunks)) return [];
+  const seen = new Set<string>();
+  return chunks.flatMap((chunk: any) => {
+    const web = chunk?.web;
+    const url = typeof web?.uri === 'string' ? web.uri : '';
+    if (!url || !/^https?:\/\//i.test(url) || seen.has(url)) return [];
+    seen.add(url);
+    return [{ title: typeof web.title === 'string' && web.title.trim() ? web.title : url, url }];
+  }).slice(0, 12);
+}
 
 async function startServer() {
   app.use(express.static('public'));
