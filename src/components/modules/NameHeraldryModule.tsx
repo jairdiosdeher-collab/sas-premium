@@ -17,7 +17,7 @@ function escapeXml(value: string) {
   return value.replace(/[<>&"']/g, (character) => entities[character] || character);
 }
 
-function buildShieldSvg(name: string, surname: string, palette: Palette) {
+function buildShieldSvg(name: string, surname: string, palette: Palette, variant: number) {
   const display = (surname || name || 'NOMBRE').toLocaleUpperCase('es').slice(0, 28);
   const initials = (name.trim().charAt(0) + (surname.trim().charAt(0) || '')).toLocaleUpperCase('es') || '✦';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1080" viewBox="0 0 900 1080" role="img" aria-labelledby="title desc">
@@ -28,10 +28,12 @@ function buildShieldSvg(name: string, surname: string, palette: Palette) {
 <text x="450" y="105" text-anchor="middle" font-family="Georgia,serif" font-size="28" letter-spacing="5" fill="${palette.field}">MEMORIA · IDENTIDAD · HISTORIA</text>
 <path d="M450 150 L700 235 L670 600 Q620 755 450 850 Q280 755 230 600 L200 235 Z" fill="${palette.field}" stroke="${palette.accent}" stroke-width="14"/>
 <path d="M450 180 L665 253 L638 590 Q594 724 450 808 Q306 724 262 590 L235 253 Z" fill="none" stroke="${palette.secondary}" stroke-width="3"/>
-<path d="M450 260 L450 720 M300 480 L600 480" stroke="${palette.accent}" stroke-width="4" opacity=".8"/>
-<circle cx="450" cy="480" r="115" fill="${palette.secondary}" stroke="${palette.accent}" stroke-width="8"/>
-<text x="450" y="505" text-anchor="middle" font-family="Georgia,serif" font-weight="bold" font-size="82" fill="${palette.field}">${escapeXml(initials)}</text>
-<text x="450" y="390" text-anchor="middle" font-family="Georgia,serif" font-size="35" fill="${palette.accent}">${palette.symbol}</text>
+${[
+  `<path d="M450 260 L450 720 M300 480 L600 480" stroke="${palette.accent}" stroke-width="4" opacity=".8"/><circle cx="450" cy="480" r="115" fill="${palette.secondary}" stroke="${palette.accent}" stroke-width="8"/><text x="450" y="505" text-anchor="middle" font-family="Georgia,serif" font-weight="bold" font-size="82" fill="${palette.field}">${escapeXml(initials)}</text><text x="450" y="390" text-anchor="middle" font-family="Georgia,serif" font-size="35" fill="${palette.accent}">${palette.symbol}</text>`,
+  `<path d="M450 265 L450 700 M270 340 L630 650 M630 340 L270 650" stroke="${palette.accent}" stroke-width="5" opacity=".8"/><path d="M450 350 L560 480 L450 610 L340 480 Z" fill="${palette.secondary}" stroke="${palette.accent}" stroke-width="8"/><text x="450" y="505" text-anchor="middle" font-family="Georgia,serif" font-weight="bold" font-size="78" fill="${palette.field}">${escapeXml(initials)}</text><text x="450" y="315" text-anchor="middle" font-family="Georgia,serif" font-size="42" fill="${palette.accent}">${palette.symbol}</text>`,
+  `<path d="M450 300 L610 430 L450 560 L290 430 Z" fill="${palette.secondary}" stroke="${palette.accent}" stroke-width="8"/><path d="M310 590 Q450 500 590 590" fill="none" stroke="${palette.accent}" stroke-width="10"/><text x="450" y="460" text-anchor="middle" font-family="Georgia,serif" font-weight="bold" font-size="82" fill="${palette.field}">${escapeXml(initials)}</text><text x="450" y="680" text-anchor="middle" font-family="Georgia,serif" font-size="45" fill="${palette.accent}">${palette.symbol}</text>`,
+  `<path d="M450 290 L560 400 L450 510 L340 400 Z" fill="${palette.secondary}" stroke="${palette.accent}" stroke-width="8"/><path d="M300 560 L600 560 M330 620 L570 620" stroke="${palette.accent}" stroke-width="8"/><circle cx="450" cy="400" r="55" fill="none" stroke="${palette.field}" stroke-width="5"/><text x="450" y="430" text-anchor="middle" font-family="Georgia,serif" font-weight="bold" font-size="60" fill="${palette.field}">${escapeXml(initials)}</text><text x="450" y="720" text-anchor="middle" font-family="Georgia,serif" font-size="45" fill="${palette.accent}">${palette.symbol}</text>`
+][variant]}
 <text x="450" y="900" text-anchor="middle" font-family="Georgia,serif" font-size="38" font-weight="bold" fill="${palette.field}">${escapeXml(display)}</text>
 <text x="450" y="950" text-anchor="middle" font-family="Georgia,serif" font-size="20" fill="#5c6470">EMBLEMA SIMBÓLICO PERSONALIZADO</text>
 <text x="450" y="990" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" fill="#6b7280">Diseño ilustrativo; no acredita armas históricas ni parentesco.</text>
@@ -49,9 +51,11 @@ export const NameHeraldryModule: React.FC = () => {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const palette = useMemo(() => palettes[((name + surname).length) % palettes.length], [name, surname]);
+  const designSeed = useMemo(() => Array.from((name.trim() + '|' + surname.trim()).toLocaleLowerCase('es')).reduce((sum, char) => sum + char.codePointAt(0)!, 0), [name, surname]);
+  const palette = useMemo(() => palettes[designSeed % palettes.length], [designSeed]);
+  const designVariant = designSeed % 4;
   const fullName = [name.trim(), surname.trim()].filter(Boolean).join(' ');
-  const shieldSvg = useMemo(() => buildShieldSvg(name.trim(), surname.trim(), palette), [name, surname, palette]);
+  const shieldSvg = useMemo(() => buildShieldSvg(name.trim(), surname.trim(), palette, designVariant), [name, surname, palette, designVariant]);
 
   const generate = async () => {
     if (!name.trim() && !surname.trim()) {
