@@ -12,7 +12,8 @@ const palettes: Palette[] = [
 ];
 
 function escapeXml(value: string) {
-  return value.replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c] || c));
+  const entities: Record<string, string> = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' };
+  return value.replace(/[<>&"']/g, (character) => entities[character] || character);
 }
 
 function buildShieldSvg(name: string, surname: string, palette: Palette) {
