@@ -44,6 +44,7 @@ import { CalendarModule } from './components/modules/CalendarModule';
 import { SermonsModule } from './components/modules/SermonsModule';
 import { SmallGroupsModule } from './components/modules/SmallGroupsModule';
 import { AiStudioModule } from './components/modules/AiStudioModule';
+import { NameHeraldryModule } from './components/modules/NameHeraldryModule';
 import { ReportsModule } from './components/modules/ReportsModule';
 import { MarketingModule } from './components/modules/MarketingModule';
 import { AffiliateModule } from './components/modules/AffiliateModule';
@@ -540,6 +541,10 @@ function AppContent() {
 
             {currentModule === 'aistudio' && (
               <AiStudioModule user={currentUser} patients={patients} />
+            )}
+
+            {currentModule === 'nameheraldry' && (
+              <NameHeraldryModule />
             )}
 
             {currentModule === 'reports' && (
