@@ -66,7 +66,13 @@ País o región familiar (si se conoce): ${country.trim() || 'no indicado'}.
 Datos de linaje aportados voluntariamente: ${lineage.trim() || 'no indicados'}.
 Enfoque: ${focus === 'complete' ? 'etimología, exégesis bíblica, devocional y heráldica crítica' : focus === 'biblical' ? 'exégesis bíblica y reflexión devocional' : 'heráldica e historia del apellido'}.
 
-Reglas obligatorias:
+Reglas obligatorias de investigación:
+- Antes de concluir sobre heráldica, realiza una búsqueda web real con Google Search grounding; no respondas solo desde memoria del modelo.
+- Busca primero si hay armas históricas documentadas para el apellido y, cuando sea posible, la región o rama familiar indicada. Incluye URLs y explica qué evidencia aporta cada fuente.
+- Distingue fuentes históricas o institucionales de páginas comerciales genéricas de escudos por apellido. Que un escudo aparezca junto a un apellido no demuestra que la persona descienda de esa rama.
+- Usa uno de estos estados en la sección heráldica: ESCUDO DOCUMENTADO PARA UNA PERSONA O RAMA CONCRETA, NO SE HA VERIFICADO UN ESCUDO APLICABLE A ESTA FAMILIA o INVESTIGACIÓN INCONCLUSA.
+- Si encuentras un escudo documentado, describe quién lo usó y cita la fuente, pero no lo atribuyas al usuario sin pruebas genealógicas. Si no hay evidencia suficiente, dilo claramente y presenta el emblema de la aplicación como simbólico, no histórico. No afirmes que ningún escudo existe cuando solo significa que no se pudo verificar.
+- Explica que la composición, figuras, colores y símbolos del emblema simbólico son una creación original para esta persona, no elementos heredados de un escudo antiguo.
 - No afirmes que el nombre determina la personalidad, el destino, la espiritualidad ni un perfil psicológico.
 - Distingue claramente hechos documentados, hipótesis etimológicas, tradición popular y reflexión devocional.
 - No inventes referencias bíblicas, palabras en hebreo/arameo/griego, fuentes, linajes ni blasones.
