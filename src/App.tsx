@@ -413,6 +413,7 @@ function AppContent() {
             setCurrentModule={setCurrentModule}
             crisisCount={crisisCount}
             userRole={currentUser.role}
+            userPlan={currentUser.plan}
             isMobileOpen={isMobileMenuOpen}
             onCloseMobile={() => setIsMobileMenuOpen(false)}
             onOpenFirebaseStatus={() => setIsFirebaseStatusOpen(true)}
@@ -544,7 +545,15 @@ function AppContent() {
             )}
 
             {currentModule === 'nameheraldry' && (
-              <NameHeraldryModule />
+              currentUser.plan !== 'free' ? (
+                <NameHeraldryModule />
+              ) : (
+                <section className="mx-auto max-w-2xl rounded-2xl border border-amber-500/30 bg-slate-900 p-6 text-center">
+                  <h1 className="text-xl font-bold text-white">Mi nombre ante la Palabra</h1>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">Esta experiencia está disponible para cuentas con un plan de pago. Actualiza tu plan para acceder al informe devocional y al emblema simbólico.</p>
+                  <button type="button" onClick={() => { setBillingInitialPlan('profesional'); setIsBillingOpen(true); }} className="mt-5 rounded-xl bg-amber-400 px-4 py-3 text-sm font-bold text-slate-950 hover:bg-amber-300">Ver planes</button>
+                </section>
+              )
             )}
 
             {currentModule === 'reports' && (

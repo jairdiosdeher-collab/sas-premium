@@ -24,7 +24,7 @@ import {
   Cloud,
   ScrollText
 } from 'lucide-react';
-import { UserRole } from '../types';
+import { PlanType, UserRole } from '../types';
 
 export type ModuleKey = 
   | 'dashboard'
@@ -54,6 +54,7 @@ interface SidebarProps {
   setCurrentModule: (mod: ModuleKey) => void;
   crisisCount: number;
   userRole?: UserRole;
+  userPlan?: PlanType;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
   onOpenFirebaseStatus?: () => void;
@@ -64,6 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setCurrentModule,
   crisisCount,
   userRole = 'psicologo',
+  userPlan = 'free',
   isMobileOpen = false,
   onCloseMobile,
   onOpenFirebaseStatus,
@@ -151,7 +153,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   // Filtrar según privilegios del rol
-  const menuItems = allMenuItems.filter(item => allowed.includes(item.key));
+  const menuItems = allMenuItems.filter(item =>
+    allowed.includes(item.key) && (item.key !== 'nameheraldry' || userPlan !== 'free')
+  );
 
   const handleSelect = (key: ModuleKey) => {
     setCurrentModule(key);
