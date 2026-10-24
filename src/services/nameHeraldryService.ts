@@ -265,6 +265,32 @@ ESTRUCTURA JSON REQUERIDA (debe contener exactamente los siguientes apartados):
   }
 
   /**
+   * Solicita una ilustración heráldica original al modelo de imágenes en el servidor.
+   * La clave de Gemini permanece exclusivamente en el backend.
+   */
+  public static async generateHeraldryImage(params: {
+    firstName: string;
+    surname: string;
+    palette: string;
+    symbol: string;
+    motto?: string;
+  }): Promise<{ imageDataUrl: string; modelUsed: string }> {
+    const response = await fetch('/api/gemini/heraldry-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success || typeof data.imageDataUrl !== 'string') {
+      throw new Error(data?.error || 'No fue posible generar la imagen con IA.');
+    }
+    if (!/^data:image\/(png|jpeg|webp);base64,/i.test(data.imageDataUrl)) {
+      throw new Error('El servidor devolvió un formato de imagen no válido.');
+    }
+    return { imageDataUrl: data.imageDataUrl, modelUsed: data.modelUsed || 'modelo de imágenes Gemini' };
+  }
+
+  /**
    * Genera el SVG del emblema personal simbólico con renderizado vectorial limpio
    */
   public static generateShieldSvg(params: {
