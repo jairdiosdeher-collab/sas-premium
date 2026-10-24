@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, 
   Sparkles, 
@@ -24,10 +24,13 @@ import {
   Clock,
   User,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle,
+  Radio
 } from 'lucide-react';
 import { Sermon, SermonType, UserProfile, HomileticSlide } from '../../types';
 import { SermonGeneratorService } from '../../services/sermonGeneratorService';
+import { GeminiService, GeminiApiStatus } from '../../services/geminiService';
 import { useToast } from '../../context/ToastContext';
 
 interface SermonsModuleProps {
@@ -43,6 +46,13 @@ export const SermonsModule: React.FC<SermonsModuleProps> = ({
 }) => {
   const { showSuccess, showInfo } = useToast();
   const [selectedSermon, setSelectedSermon] = useState<Sermon | null>(sermons[0] || null);
+  const [aiStatus, setAiStatus] = useState<GeminiApiStatus | null>(null);
+
+  useEffect(() => {
+    GeminiService.checkApiStatus()
+      .then(setAiStatus)
+      .catch((e) => console.warn('No se pudo verificar estado de IA:', e));
+  }, []);
   const [searchTerm, setSearchTerm] = useState('');
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -221,13 +231,29 @@ ${(selectedSermon.supportingPassages || []).join(', ')}`;
           </p>
         </div>
 
-        <button
-          onClick={() => setIsGeneratorOpen(true)}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
-        >
-          <Sparkles className="w-4 h-4 fill-slate-950" />
-          <span>Generar Nuevo Sermón con IA</span>
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {aiStatus && (
+            <div
+              className={`px-3 py-1.5 rounded-xl border text-[11px] font-semibold flex items-center gap-2 ${
+                aiStatus.configured
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                  : 'bg-amber-500/10 text-amber-300 border-amber-500/25'
+              }`}
+              title={aiStatus.message}
+            >
+              <span className={`w-2 h-2 rounded-full ${aiStatus.configured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+              <span>{aiStatus.configured ? `IA Gemini Conectada (${aiStatus.activeModel})` : 'Motor Contextual Local'}</span>
+            </div>
+          )}
+
+          <button
+            onClick={() => setIsGeneratorOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+          >
+            <Sparkles className="w-4 h-4 fill-slate-950" />
+            <span>Generar Nuevo Sermón con IA</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Grid: Library on Left, Selected Sermon on Right */}
@@ -307,12 +333,14 @@ ${(selectedSermon.supportingPassages || []).join(', ')}`;
                       Género: {(selectedSermon.sermonType || 'Expositivo').toUpperCase()}
                     </span>
                     {selectedSermon.generationSource && (
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                      <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${
                         selectedSermon.generationSource === 'gemini-live'
                           ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                          : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                          : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                       }`}>
-                        {selectedSermon.generationSource === 'gemini-live' ? '✓ Generado con IA en Vivo' : '✓ Motor Hermenéutico Local'}
+                        {selectedSermon.generationSource === 'gemini-live' 
+                          ? `✓ Generado con IA en Vivo (${selectedSermon.generationModel || 'Gemini 3.8 Flash'})` 
+                          : '⚠️ Motor Contextual Local'}
                       </span>
                     )}
                   </div>
@@ -335,6 +363,23 @@ ${(selectedSermon.supportingPassages || []).join(', ')}`;
                       </>
                     )}
                   </div>
+
+                  {selectedSermon.generationSource === 'local-engine' && selectedSermon.generationError && (
+                    <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-200 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>Generado con Motor Contextual Local</span>
+                      </div>
+                      <p className="text-[11px] text-amber-200/90 pl-5">
+                        <strong>Causa:</strong> {selectedSermon.generationError}
+                      </p>
+                      {selectedSermon.generationErrorHint && (
+                        <p className="text-[10px] text-amber-300/80 pl-5">
+                          💡 <strong>Sugerencia:</strong> {selectedSermon.generationErrorHint}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -738,7 +783,7 @@ ${(selectedSermon.supportingPassages || []).join(', ')}`;
                 <button
                   type="button"
                   onClick={() => {
-                    setTheme('La gracia de Dios');
+                    setTheme('La gracia soberana y salvación');
                     setMainPassage('Efesios 2:1-10');
                     setSermonType('expositivo');
                     setTargetAudience('Congregación General');
@@ -766,16 +811,30 @@ ${(selectedSermon.supportingPassages || []).join(', ')}`;
                 <button
                   type="button"
                   onClick={() => {
-                    setTheme('El perdón en la familia');
-                    setMainPassage('Colosenses 3:12-15');
+                    setTheme('Cuidado y confianza en Dios');
+                    setMainPassage('Salmo 23');
                     setSermonType('pastoral');
-                    setTargetAudience('Familias y matrimonios');
-                    setObjective('Derribar murallas de resentimiento y perdonar como Cristo perdonó.');
-                    setTheologicalFocus('Amor sacrificial y el perdón como cancelación de deudas');
+                    setTargetAudience('Personas en ansiedad o fatiga');
+                    setObjective('Descansar en el pastoreo divino y la provisión abundante en medio del valle.');
+                    setTheologicalFocus('Provisión del pacto, consuelo y fidelidad eterna');
                   }}
                   className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium transition"
                 >
-                  ⚡ Prueba C: Familia (Col. 3:12-15)
+                  ⚡ Prueba C: Pastor (Salmo 23)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTheme('La verdadera espiritualidad ante Dios');
+                    setMainPassage('Miqueas 6:6-8');
+                    setSermonType('tematico');
+                    setTargetAudience('Comunidad de creyentes');
+                    setObjective('Practicar la justicia, amar la misericordia y humillarse ante el Señor.');
+                    setTheologicalFocus('Justicia profética y adoración sincera');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 font-medium transition"
+                >
+                  ⚡ Prueba D: Profetas (Miqueas 6:6-8)
                 </button>
               </div>
             </div>

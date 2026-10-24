@@ -221,6 +221,9 @@ export interface Sermon {
   dateCreated: string;
   targetAudience: string;
   generationSource?: 'gemini-live' | 'local-engine';
+  generationModel?: string;
+  generationError?: string;
+  generationErrorHint?: string;
 }
 
 export interface SmallGroupResource {

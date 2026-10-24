@@ -161,8 +161,14 @@ export const COLLECTIONS = {
   PATIENTS: "patients",
   SESSIONS: "sessions",
   NOTES: "notes",
+  SOAP_NOTES: "notes",
   ASSESSMENTS: "assessments",
+  APPOINTMENTS: "appointments",
   DOCUMENTS: "documents",
+  SERMONS: "sermons",
+  JOURNAL: "journal",
+  REPORTS: "reports",
+  TASKS: "tasks",
   BACKUPS: "backups",
 } as const;
 

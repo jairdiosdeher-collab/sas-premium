@@ -7,45 +7,117 @@
 export interface AiGenerationResult {
   text: string;
   source: 'gemini-live' | 'local-engine';
+  modelUsed?: string;
+  error?: {
+    code: string;
+    message: string;
+    hint?: string;
+  };
+}
+
+export interface GeminiApiStatus {
+  configured: boolean;
+  activeModel: string;
+  fallbackModel?: string;
+  status: 'ready' | 'missing_api_key' | 'error';
+  message: string;
+  environment?: string;
+}
+
+function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    return '';
+  }
+  return 'http://127.0.0.1:3000';
 }
 
 export class GeminiService {
   public static async callGeminiWithFallback(
     prompt: string,
-    systemInstruction?: string
+    systemInstruction?: string,
+    responseMimeType?: string
   ): Promise<string> {
-    const result = await callGeminiApi(prompt, systemInstruction);
+    const result = await callGeminiApi(prompt, systemInstruction, responseMimeType);
     return result.text;
+  }
+
+  public static async checkApiStatus(): Promise<GeminiApiStatus> {
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/api/gemini/status`);
+      if (res.ok) {
+        return await res.json();
+      }
+      return {
+        configured: false,
+        activeModel: 'gemini-3.8-flash',
+        status: 'error',
+        message: `Servidor devolvió código HTTP ${res.status}`,
+      };
+    } catch (e: any) {
+      return {
+        configured: false,
+        activeModel: 'gemini-3.8-flash',
+        status: 'error',
+        message: 'No fue posible conectar con el endpoint de IA (/api/gemini/status)',
+      };
+    }
   }
 }
 
 export async function callGeminiApi(
   prompt: string,
-  systemInstruction?: string
+  systemInstruction?: string,
+  responseMimeType?: string
 ): Promise<AiGenerationResult> {
+  let capturedError: AiGenerationResult['error'] = undefined;
+
   try {
-    const res = await fetch('/api/gemini/generate', {
+    const res = await fetch(`${getApiBaseUrl()}/api/gemini/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, systemInstruction }),
+      body: JSON.stringify({ prompt, systemInstruction, responseMimeType }),
     });
 
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.text) {
-        return { text: data.text, source: 'gemini-live' };
+        return {
+          text: data.text,
+          source: 'gemini-live',
+          modelUsed: data.modelUsed || 'gemini-3.8-flash',
+        };
       }
+      if (data.error) {
+        capturedError = {
+          code: data.error.code || 'UNKNOWN_ERROR',
+          message: data.error.message || 'Error no especificado por la API',
+          hint: data.error.hint,
+        };
+      }
+    } else {
+      const errData = await res.json().catch(() => null);
+      capturedError = {
+        code: errData?.error?.code || `HTTP_${res.status}`,
+        message: errData?.error?.message || `El servidor de IA respondió con error HTTP ${res.status}`,
+        hint: errData?.error?.hint,
+      };
     }
-  } catch (err) {
-    console.warn('Fallback al motor clínico-pastoral local:', err);
+  } catch (err: any) {
+    console.warn('Conexión con /api/gemini/generate no disponible:', err?.message || err);
+    capturedError = {
+      code: 'NETWORK_OR_OFFLINE',
+      message: err?.message || 'Error de conexión de red al llamar a la API de Gemini.',
+      hint: 'Verifica tu conexión a internet o el estado de despliegue en Vercel/Local.',
+    };
   }
 
-  // Fallback inteligente contextual
+  // Fallback inteligente contextual transparente (nunca estático ni engañoso)
   return {
     text: generateIntelligentFallback(prompt, systemInstruction),
     source: 'local-engine',
+    error: capturedError,
   };
 }
 
@@ -54,37 +126,32 @@ function generateIntelligentFallback(prompt: string, systemInstruction?: string)
 
   // Caso 1: Generación de Sermón Homilético
   if (p.includes('sermón') || p.includes('bosquejo') || p.includes('predicación') || p.includes('homilética')) {
-    return `### BOSQUEJO HOMILÉTICO EXEGÉTICO
-**Título del Mensaje:** Gracia en la Grieta: Restauración para el Alma Quebrantada
-**Pasaje Principal:** 2 Corintios 12:8-10 & Salmo 34:18
+    // Extraer pasaje y tema si están presentes en el prompt
+    const passageMatch = prompt.match(/pasaje(?:\s+b[íi]blico)?(?:\s+principal)?:\s*([^\n\r]+)/i);
+    const themeMatch = prompt.match(/tema(?:\s+central)?:\s*([^\n\r]+)/i);
+
+    const extractedPassage = passageMatch ? passageMatch[1].trim() : 'Texto Bíblico Solicitado';
+    const extractedTheme = themeMatch ? themeMatch[1].trim() : 'Mensaje Pastoral';
+
+    return `### BOSQUEJO HOMILÉTICO (MOTOR LOCAL CONTEXTUAL)
+> *Nota: Generado mediante motor local debido a indisponibilidad temporal del servicio Gemini en vivo.*
+
+**Título del Mensaje:** ${extractedTheme}: La Fidelidad de Dios en ${extractedPassage}
+**Pasaje Principal:** ${extractedPassage}
 
 #### 1. Proposición Homilética Central:
-"Nuestra fragilidad humana no descalifica el propósito de Dios; es precisamente el escenario donde Su poder soberano resplandece con mayor nitidez."
+"La revelación de Dios en ${extractedPassage} nos llama a vivir conforme a Su propósito transformador, encontrando en Cristo la plenitud de nuestra fe."
 
-#### 2. Introducción Cautivadora:
-- **Gancho:** En la cultura japonesa existe el arte del *Kintsugi*: reparar vasijas de cerámica rotas usando laca espolvoreada con oro puro. En lugar de ocultar las fracturas, las grietas se vuelven la parte más valiosa de la pieza.
-- **Tensión:** ¿Cuántas veces en el ministerio intentamos ocultar nuestro cansancio, nuestras dudas o nuestro dolor por temor al juicio de los demás?
-- **Punto de Giro Bíblico:** El apóstol Pablo oró tres veces para que le fuera quitado su "aguijón en la carne". La respuesta de Cristo no fue alivio instantáneo, sino una revelación más profunda de la suficiencia de la gracia.
+#### 2. Introducción Contextual:
+El pasaje de ${extractedPassage} nos sitúa ante una verdad imperecedera que desafía la autosuficiencia humana y nos invita a reflexionar profundamente en ${extractedTheme}.
 
-#### 3. Desarrollo Homilético (3 Puntos Exegéticos):
+#### 3. Puntos Principales:
+- **Punto I: El Fundamento Divino en ${extractedPassage}** (Análisis exegético del texto bíblico).
+- **Punto II: La Demanda y Gracia del Evangelio** (Aplicación al corazón humano).
+- **Punto III: Transformación Práctica** (Viviendo esta verdad en la comunidad).
 
-**Punto I: La paradoja del aguijón: Cuando la oración recibe un 'No' lleno de gracia**
-- *Exégesis:* El término griego *skolops* designaba una estaca afilada. Dios permitió este límite para preservar la humildad de Pablo ante revelaciones celestiales.
-- *Ilustración contemporánea:* Los rieles de un tren de alta velocidad no restringen su libertad, definen la única ruta segura donde puede alcanzar su máximo potencial sin descarrilar.
-- *Aplicación práctica:* Acepta tus límites biológicos y emocionales como guardianes divinos contra la soberbia ministerial.
-
-**Punto II: 'Bástate mi gracia': La suficiencia de Cristo en el agotamiento**
-- *Exégesis:* El verbo *arkei* (bastar) está en tiempo presente continuo: "Mi gracia te es continuamente suficiente". No es un crédito del pasado, es suministro diario de maná.
-- *Ilustración contemporánea:* La batería de un dispositivo móvil no se recarga agitándolo con fuerza; debe conectarse quieto a la fuente de poder.
-- *Aplicación práctica:* Establece una disciplina diaria de 15 minutos de oración contemplativa antes de revisar mensajes de WhatsApp congregacionales.
-
-**Punto III: El poder que se perfecciona en la debilidad**
-- *Exégesis:* La palabra *teleskō* (perfeccionar/consumar) indica que el poder de Dios alcanza su plenitud visible cuando desaparece la autosuficiencia humana.
-- *Ilustración contemporánea:* Una linterna de alta potencia sólo se nota cuando cae la noche más oscura; a pleno mediodía su brillo es imperceptible.
-- *Aplicación práctica:* Atrévete a liderar desde la vulnerabilidad bíblica en tu grupo pequeño esta semana.
-
-#### 4. Conclusión y Llamado al Altar:
-No salgas hoy de este santuario prometiendo a Dios esforzarte más con tus propias fuerzas humanas. Ven al pie de la cruz a canjear tu fatiga por Su reposo sobrenatural.`;
+#### 4. Conclusión Cristocéntrica y Llamado:
+Descansar en la promesa de Dios en ${extractedPassage} y responder con obediencia y gratitud.`;
   }
 
   // Caso 2: Síntesis de Nota SOAP-S de Evolución Clínica

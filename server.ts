@@ -34,45 +34,94 @@ if (apiKey) {
   });
 }
 
+// Endpoint de diagnóstico del estado de la IA
+app.get('/api/gemini/status', (_req, res) => {
+  return res.json({
+    configured: Boolean(apiKey && apiKey.trim().length > 10),
+    activeModel: 'gemini-3.8-flash',
+    fallbackModel: 'gemini-3.1-flash-lite',
+    status: apiKey ? 'ready' : 'missing_api_key',
+    message: apiKey
+      ? 'Servicio de IA Gemini conectado y listo para producción.'
+      : 'GEMINI_API_KEY no detectada en las variables de entorno.',
+  });
+});
+
 app.post('/api/gemini/generate', async (req, res) => {
   try {
-    const { prompt, systemInstruction } = req.body;
-    if (!ai) {
-      return res.status(200).json({
+    const { prompt, systemInstruction, responseMimeType } = req.body;
+
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({
         success: false,
-        fallback: true,
-        message: 'Servidor sin GEMINI_API_KEY activa.',
+        error: {
+          code: 'INVALID_PROMPT',
+          message: 'El campo "prompt" es obligatorio y debe ser una cadena de texto.',
+        },
+      });
+    }
+
+    if (!ai) {
+      return res.status(503).json({
+        success: false,
+        error: {
+          code: 'MISSING_API_KEY',
+          message: 'Servidor sin GEMINI_API_KEY activa en el entorno de ejecución.',
+          hint: 'Configura la variable GEMINI_API_KEY en el archivo .env o en el panel de variables de Vercel.',
+        },
       });
     }
 
     let responseText = '';
+    let modelUsed = 'gemini-3.8-flash';
+
+    const config: any = {};
+    if (systemInstruction) config.systemInstruction = systemInstruction;
+    if (responseMimeType) config.responseMimeType = responseMimeType;
+
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
         contents: prompt,
-        config: systemInstruction ? { systemInstruction } : undefined,
+        config: Object.keys(config).length > 0 ? config : undefined,
       });
       responseText = response.text || '';
-    } catch (_primaryErr) {
-      // Fallback a gemini-3.1-flash-lite si gemini-3.8-flash tiene alta demanda
+    } catch (primaryErr: any) {
+      console.warn('Aviso: gemini-3.8-flash no respondió, intentando con gemini-3.1-flash-lite:', primaryErr?.message || primaryErr);
+      modelUsed = 'gemini-3.1-flash-lite';
       const fallbackResponse = await ai.models.generateContent({
         model: 'gemini-3.1-flash-lite',
         contents: prompt,
-        config: systemInstruction ? { systemInstruction } : undefined,
+        config: Object.keys(config).length > 0 ? config : undefined,
       });
       responseText = fallbackResponse.text || '';
+    }
+
+    if (!responseText.trim()) {
+      return res.status(502).json({
+        success: false,
+        error: {
+          code: 'EMPTY_RESPONSE',
+          message: 'La API de Gemini devolvió una respuesta vacía.',
+          model: modelUsed,
+        },
+      });
     }
 
     return res.json({
       success: true,
       text: responseText,
+      modelUsed,
     });
   } catch (error: any) {
-    console.warn('Aviso en /api/gemini/generate:', error?.message || error);
-    return res.status(200).json({
+    const errorMessage = error?.message || String(error);
+    console.error('Error en /api/gemini/generate:', errorMessage);
+    return res.status(502).json({
       success: false,
-      fallback: true,
-      error: error?.message || 'IA procesada mediante motor contextual.',
+      error: {
+        code: 'GEMINI_API_ERROR',
+        message: errorMessage,
+      },
     });
   }
 });
