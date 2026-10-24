@@ -144,6 +144,8 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
     }
 
     setIsLoading(true);
+    setGeneratedShieldImage(null);
+    setShieldImageNotice(null);
 
     const request: NameSearchRequest = {
       firstName: firstName.trim(),
@@ -184,6 +186,8 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
     setReport(null);
     setCurrentStep(1);
     setIsSavedInDevotionals(false);
+    setGeneratedShieldImage(null);
+    setShieldImageNotice(null);
   };
 
   const handleSaveToDevotionals = () => {
@@ -251,9 +255,19 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
     setIsExportingPng(true);
     try {
       const filename = firstSurname || firstName || 'Heraldica';
-      await NameHeraldryService.exportShieldAsPng(currentShieldSvg, filename);
+      if (generatedShieldImage) {
+        const extension = generatedShieldImage.startsWith('data:image/jpeg') ? 'jpg'
+          : generatedShieldImage.startsWith('data:image/webp') ? 'webp' : 'png';
+        const link = document.createElement('a');
+        link.href = generatedShieldImage;
+        link.download = `Emblema_IA_${filename.replace(/[^a-zA-Z0-9_-]/g, '_')}.${extension}`;
+        link.click();
+      } else {
+        await NameHeraldryService.exportShieldAsPng(currentShieldSvg, filename);
+      }
     } catch (err) {
-      console.error('Error al exportar PNG:', err);
+      console.error('Error al exportar imagen:', err);
+      setShieldImageNotice('No fue posible descargar la imagen. Inténtalo de nuevo.');
     } finally {
       setIsExportingPng(false);
     }
@@ -722,6 +736,20 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-serif"
               />
             </div>
+          </div>
+
+          {/* Generación opcional de ilustración original por IA */}
+          <div className="space-y-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={handleGenerateShieldImage}
+              disabled={isGeneratingShieldImage}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 disabled:opacity-60 text-slate-950 text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isGeneratingShieldImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              <span>{isGeneratingShieldImage ? 'Generando ilustración con IA…' : generatedShieldImage ? 'Regenerar ilustración heráldica con IA' : 'Generar ilustración heráldica con IA'}</span>
+            </button>
+            {shieldImageNotice && <p role="status" className="text-[11px] leading-relaxed text-amber-200">{shieldImageNotice}</p>}
           </div>
 
           {/* Botones de Descarga del Emblema */}
