@@ -1,6 +1,19 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { GoogleGenAI } from '@google/genai';
 
+function extractGroundingSources(response: any): Array<{ title: string; url: string }> {
+  const chunks = response?.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  if (!Array.isArray(chunks)) return [];
+  const seen = new Set<string>();
+  return chunks.flatMap((chunk: any) => {
+    const web = chunk?.web;
+    const url = typeof web?.uri === 'string' ? web.uri : '';
+    if (!url || !/^https?:\/\//i.test(url) || seen.has(url)) return [];
+    seen.add(url);
+    return [{ title: typeof web.title === 'string' && web.title.trim() ? web.title : url, url }];
+  }).slice(0, 12);
+}
+
 async function parseBody(req: IncomingMessage): Promise<any> {
   if ((req as any).body) {
     return (req as any).body;
@@ -51,6 +64,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   }
 
   const { prompt, systemInstruction, responseMimeType } = body;
+  const enableWebSearch = body.enableWebSearch === true;
   if (!prompt || typeof prompt !== 'string') {
     res.statusCode = 400;
     return res.end(JSON.stringify({ success: false, error: { code: 'INVALID_PROMPT', message: 'El campo "prompt" es requerido.' } }));
@@ -69,8 +83,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const config: any = {};
     if (systemInstruction) config.systemInstruction = systemInstruction;
     if (responseMimeType) config.responseMimeType = responseMimeType;
+    if (enableWebSearch) config.tools = [{ googleSearch: {} }];
 
     let responseText = '';
+    let groundingSources: Array<{ title: string; url: string }> = [];
     let modelUsed = 'gemini-3.8-flash';
 
     try {
@@ -80,6 +96,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         config: Object.keys(config).length > 0 ? config : undefined,
       });
       responseText = response.text || '';
+      groundingSources = extractGroundingSources(response);
     } catch (err: any) {
       console.warn('Vercel Gemini 3.8 Flash aviso, intentando con 3.1 Flash Lite:', err?.message || err);
       modelUsed = 'gemini-3.1-flash-lite';
@@ -89,6 +106,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         config: Object.keys(config).length > 0 ? config : undefined,
       });
       responseText = fallbackResponse.text || '';
+      groundingSources = extractGroundingSources(fallbackResponse);
     }
 
     if (!responseText.trim()) {
@@ -104,6 +122,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       success: true,
       text: responseText,
       modelUsed,
+      groundingSources,
+      webSearchRequested: enableWebSearch,
       environment: 'vercel-serverless',
     }));
   } catch (error: any) {
