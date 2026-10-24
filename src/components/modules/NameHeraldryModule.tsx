@@ -103,6 +103,12 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
     });
   }, [firstName, firstSurname, selectedPalette, selectedCharge, report, customMotto]);
 
+  // Fuente SVG autocontenida para la portada impresa: no depende de Gemini ni de CSS externo.
+  const printShieldDataUrl = useMemo(() => {
+    const printSvg = currentShieldSvg.replace('width="100%" height="100%"', 'width="900" height="1150"');
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(printSvg);
+  }, [currentShieldSvg]);
+
   // Verification if user has access or available credits
   const hasCredits = (currentUser.credits ?? 0) > 0;
   const isFreePlan = currentUser.plan === 'free';
@@ -1357,11 +1363,12 @@ export const NameHeraldryModule: React.FC<NameHeraldryModuleProps> = ({
 
             {/* EMBLEMA CENTRAL COMPLETO, NÍTIDO Y EXACTAMENTE CENTRADO */}
             <div className="my-4 w-full max-w-[130mm] aspect-[900/1150] shield-svg-wrapper flex items-center justify-center border border-amber-900/20 rounded-2xl bg-[#f8f4ea] p-3 shadow-none">
-              {generatedShieldImage ? (
-                <img src={generatedShieldImage} alt={`Ilustración heráldica personalizada de ${report.sectionA_Name.submittedFullName}`} className="heraldry-generated-image w-full h-full object-contain" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:object-contain" dangerouslySetInnerHTML={{ __html: currentShieldSvg }} />
-              )}
+              <img
+                src={printShieldDataUrl}
+                alt={`Escudo vectorial de ${report.sectionA_Name.submittedFullName}`}
+                className="print-shield-image"
+                style={{ display: 'block', width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              />
             </div>
 
             <div className="space-y-1">
